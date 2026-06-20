@@ -7,6 +7,12 @@ class VoucherType(str, Enum):
     RECEIPT = "RECEIPT"
     CONTRA = "CONTRA"
     JOURNAL = "JOURNAL"
+    OPENING = "OPENING"
+
+class VoucherStatus(str, Enum):
+    DRAFT = "DRAFT"
+    POSTED = "POSTED"
+    CANCELLED = "CANCELLED"
 
 class ItemType(str, Enum):
     PRODUCT = "PRODUCT"

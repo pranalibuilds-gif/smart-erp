@@ -17,8 +17,8 @@ async def test_register_user_success(db):
 
     assert response.user.email == "test@example.com"
     assert response.user.full_name == "Test User"
-    assert response.tokens.access_token is not None
-    assert response.tokens.refresh_token is not None
+    assert response.access_token is not None
+    assert response.refresh_token is not None
 
 @pytest.mark.anyio
 async def test_register_user_duplicate_email(db):

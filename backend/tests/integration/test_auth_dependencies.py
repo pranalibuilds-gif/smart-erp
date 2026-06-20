@@ -40,7 +40,7 @@ async def seed_data(db):
     db.add(user)
 
     # 2. Create Company
-    company = Company(name="Test Co", slug=f"test-co-{uid}")
+    company = Company(name="Test Co", legal_name="Test Co Ltd", slug=f"test-co-{uid}")
     db.add(company)
 
     # 3. Create Superuser
@@ -114,7 +114,7 @@ async def test_get_current_company_success(client: AsyncClient, seed_data):
 
 @pytest.mark.anyio
 async def test_get_current_company_no_access(client: AsyncClient, seed_data, db):
-    other_company = Company(name="Other", slug=f"other-{uuid.uuid4()}")
+    other_company = Company(name="Other", legal_name="Other Ltd", slug=f"other-{uuid.uuid4()}")
     db.add(other_company)
     await db.commit()
 

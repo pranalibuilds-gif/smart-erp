@@ -29,7 +29,7 @@ async def test_refresh_session_rotation(db):
         email="refresh@example.com", password="password", full_name="User"
     ))
 
-    old_refresh = reg.tokens.refresh_token
+    old_refresh = reg.refresh_token
 
     # Wait a bit? No need.
     new_tokens = await session_service.refresh_session(old_refresh)
@@ -50,7 +50,7 @@ async def test_revoke_session(db):
         email="logout@example.com", password="password", full_name="User"
     ))
 
-    token = reg.tokens.refresh_token
+    token = reg.refresh_token
     await session_service.revoke_session(token)
 
     # Refresh should fail now
@@ -66,7 +66,7 @@ async def test_multi_device_sessions(db):
         email="multi@example.com", password="password", full_name="User"
     ))
 
-    token1 = reg.tokens.refresh_token
+    token1 = reg.refresh_token
 
     # Second login
     tokens2 = await auth_service.authenticate_user("multi@example.com", "password")

@@ -1,23 +1,70 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+import apiClient from "@/lib/api-client";
+
+export interface Company {
+  id: string;
+  name: string;
+  legal_name: string;
+  slug: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  state?: string;
+  country: string;
+}
 
 interface CompanyState {
-  activeCompanyId: string | null;
-  activeFinancialYearId: string | null;
-  setActiveCompany: (id: string) => void;
-  setActiveFinancialYear: (id: string) => void;
+  activeCompany: Company | null;
+  companies: Company[];
+  isLoading: boolean;
+
+  fetchCompanies: () => Promise<void>;
+  setActiveCompany: (company: Company) => void;
+  createCompany: (data: any) => Promise<Company>;
 }
 
 export const useCompanyStore = create<CompanyState>()(
   persist(
-    (set) => ({
-      activeCompanyId: null,
-      activeFinancialYearId: null,
-      setActiveCompany: (id) => set({ activeCompanyId: id }),
-      setActiveFinancialYear: (id) => set({ activeFinancialYearId: id }),
+    (set, get) => ({
+      activeCompany: null,
+      companies: [],
+      isLoading: false,
+
+      fetchCompanies: async () => {
+        set({ isLoading: true });
+        try {
+          const response = await apiClient.get("/api/v1/companies");
+          set({ companies: response.data.data, isLoading: false });
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      setActiveCompany: (company: Company) => {
+        set({ activeCompany: company });
+      },
+
+      createCompany: async (data: any) => {
+        set({ isLoading: true });
+        try {
+          const response = await apiClient.post("/api/v1/companies", data);
+          const newCompany = response.data.data;
+          set((state) => ({
+            companies: [...state.companies, newCompany],
+            isLoading: false
+          }));
+          return newCompany;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
     }),
     {
       name: "company-storage",
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );

@@ -1,4 +1,7 @@
-from sqlalchemy.orm import Mapped, mapped_column
+import uuid
+from datetime import date
+from sqlalchemy import String, ForeignKey, Date, Boolean
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.database.base import Base
 from app.shared.database.mixins import UUIDMixin, AuditMixin
 
@@ -6,10 +9,33 @@ from app.shared.database.mixins import UUIDMixin, AuditMixin
 class Company(Base, UUIDMixin, AuditMixin):
     __tablename__ = "companies"
 
-    name: Mapped[str] = mapped_column(index=True)
-    slug: Mapped[str] = mapped_column(unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    legal_name: Mapped[str] = mapped_column(String(255))
+    slug: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+
+    email: Mapped[str | None] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(20))
+    address: Mapped[str | None] = mapped_column(String(500))
+    state: Mapped[str | None] = mapped_column(String(100))
+    country: Mapped[str] = mapped_column(String(100), default="India")
+
+    gst_number: Mapped[str | None] = mapped_column(String(15))
+    logo_url: Mapped[str | None] = mapped_column(String(500))
+
     is_active: Mapped[bool] = mapped_column(default=True)
 
-    # Financial data (optional initially)
-    address: Mapped[str | None] = mapped_column()
-    gstin: Mapped[str | None] = mapped_column()
+    # Relationships
+    financial_years = relationship("FinancialYear", back_populates="company", cascade="all, delete-orphan")
+
+
+class FinancialYear(Base, UUIDMixin, AuditMixin):
+    __tablename__ = "financial_years"
+
+    company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100)) # e.g., "2025-2026"
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date] = mapped_column(Date)
+    is_closed: Mapped[bool] = mapped_column(default=False)
+
+    # Relationships
+    company = relationship("Company", back_populates="financial_years")

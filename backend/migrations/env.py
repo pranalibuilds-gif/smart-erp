@@ -10,9 +10,9 @@ from alembic import context
 # Import settings and metadata
 from app.core.config import settings
 from app.shared.database.base import Base
-# Import all models here so Alembic can see them
 from app.modules.auth.models import User, Role, Permission, RolePermission, UserCompanyRole, RefreshToken
-from app.modules.companies.models import Company
+from app.modules.companies.models import Company, FinancialYear
+from app.modules.masters.models import AccountGroup, Ledger, Unit, StockGroup, StockItem
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

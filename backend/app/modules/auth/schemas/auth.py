@@ -1,15 +1,11 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 class UserBase(BaseModel):
     email: EmailStr
     full_name: str
-
-
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)
 
 
 class UserRead(UserBase):
@@ -30,17 +26,3 @@ class Token(BaseModel):
 class TokenPayload(BaseModel):
     sub: str | None = None
     type: str | None = None
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
-class UserRegistrationResponse(BaseModel):
-    user: UserRead
-    tokens: Token

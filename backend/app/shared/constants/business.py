@@ -11,3 +11,13 @@ class VoucherType(str, Enum):
 class ItemType(str, Enum):
     PRODUCT = "PRODUCT"
     SERVICE = "SERVICE"
+
+class AccountNature(str, Enum):
+    ASSET = "ASSET"
+    LIABILITY = "LIABILITY"
+    INCOME = "INCOME"
+    EXPENSE = "EXPENSE"
+
+class BalanceType(str, Enum):
+    DEBIT = "DEBIT"
+    CREDIT = "CREDIT"

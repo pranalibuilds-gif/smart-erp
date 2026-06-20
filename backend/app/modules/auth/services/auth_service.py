@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from app.core.security import hash_password, verify_password
 from app.modules.auth.models import User
 from app.modules.auth.repository import UserRepository
-from app.modules.auth.schemas import UserCreate, UserRegistrationResponse
+from app.modules.auth.schemas import UserCreate, AuthResponse
 from app.modules.auth.services.session_service import SessionService
 
 
@@ -20,7 +20,7 @@ class AuthService:
         user_in: UserCreate,
         user_agent: str | None = None,
         ip_address: str | None = None
-    ) -> UserRegistrationResponse:
+    ) -> AuthResponse:
         """
         Registers a new user and automatically logs them in.
         Transactional: User and Session created together.
@@ -50,9 +50,11 @@ class AuthService:
         await self.db.commit()
         await self.db.refresh(new_user)
 
-        return UserRegistrationResponse(
+        return AuthResponse(
             user=new_user,
-            tokens=tokens
+            access_token=tokens.access_token,
+            refresh_token=tokens.refresh_token,
+            token_type=tokens.token_type
         )
 
     async def authenticate_user(

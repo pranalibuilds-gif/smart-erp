@@ -1,3 +1,5 @@
+import uuid
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
 from jose import jwt, JWTError
@@ -41,7 +43,8 @@ def create_token(
         "exp": expire,
         "sub": str(subject),
         "type": token_type,
-        "iat": datetime.now(timezone.utc)
+        "iat": datetime.now(timezone.utc),
+        "jti": str(uuid.uuid4()) # Ensure token uniqueness
     }
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt

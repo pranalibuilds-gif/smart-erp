@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime
-from sqlalchemy import ForeignKey, String, UniqueConstraint, DateTime
+from datetime import datetime, timezone
+from sqlalchemy import ForeignKey, String, UniqueConstraint, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.database.base import Base
 from app.shared.database.mixins import UUIDMixin, AuditMixin
@@ -20,8 +20,7 @@ class RolePermission(Base):
 
 class UserCompanyRole(Base):
     """
-    Contextual RBAC: Links Users to Companies with specific Roles.
-    Allows a User to have multiple roles in the same company.
+    Contextual RBAC: Links Users to Companies with exactly one Role.
     """
     __tablename__ = "user_company_roles"
 
@@ -32,11 +31,7 @@ class UserCompanyRole(Base):
         ForeignKey("companies.id", ondelete="CASCADE"), primary_key=True
     )
     role_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
-    )
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "company_id", "role_id", name="uq_user_company_role"),
+        ForeignKey("roles.id", ondelete="CASCADE"), nullable=False
     )
 
 
@@ -73,5 +68,8 @@ class RefreshToken(Base, UUIDMixin):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     token_hash: Mapped[str] = mapped_column(String(255), index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    user_agent: Mapped[str | None] = mapped_column(String(500))
+    ip_address: Mapped[str | None] = mapped_column(String(100))

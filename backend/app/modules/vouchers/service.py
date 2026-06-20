@@ -1,15 +1,90 @@
 import uuid
 from typing import List, Sequence, Optional
 from datetime import date
+from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 
-from .models import Voucher, VoucherEntry, VoucherSequence
-from .schemas.vouchers import VoucherCreate, VoucherUpdate
+from .models import Voucher, VoucherEntry, VoucherSequence, InventoryTransaction
+from .schemas.vouchers import VoucherCreate, VoucherUpdate, InventoryEntryCreate
 from app.modules.companies.models import FinancialYear
+from app.modules.masters.models import StockItem
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import VoucherType, VoucherStatus
+
+
+class InventoryPostingService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def post_inventory(self, company_id: uuid.UUID, voucher: Voucher, user_id: uuid.UUID):
+        # Determine direction based on voucher type
+        # PURCHASE, OPENING, ADJ_IN -> Inward (1)
+        # SALES, ADJ_OUT -> Outward (-1)
+        direction_map = {
+            VoucherType.PURCHASE: 1,
+            VoucherType.OPENING: 1,
+            VoucherType.SALES: -1,
+        }
+        direction = direction_map.get(voucher.voucher_type, 0)
+        if direction == 0:
+            return # This voucher type doesn't affect inventory
+
+        for entry in voucher.inventory_entries:
+            # 1. Lock StockItem
+            stmt = select(StockItem).where(and_(StockItem.id == entry.stock_item_id, StockItem.company_id == company_id)).with_for_update()
+            res = await self.db.execute(stmt)
+            item = res.scalar_one()
+
+            # 2. Critical Law: No Negative Stock
+            new_qty = Decimal(str(item.current_quantity)) + (Decimal(str(entry.quantity)) * direction)
+            if new_qty < 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Negative stock not allowed for item '{item.name}'. Current: {item.current_quantity}, Requested: {entry.quantity}"
+                )
+
+            # 3. Update Average Cost (WAC) for Inward
+            if direction == 1:
+                # Formula: (Old Qty * Old Avg Cost + Incoming Qty * Incoming Rate) / (Old Qty + Incoming Qty)
+                total_value = (Decimal(str(item.current_quantity)) * Decimal(str(item.average_cost))) + (Decimal(str(entry.quantity)) * Decimal(str(entry.rate)))
+                if new_qty > 0:
+                    item.average_cost = total_value / new_qty
+
+            # 4. Update Quantity Cache
+            item.current_quantity = new_qty
+            item.updated_by = user_id
+
+    async def reverse_inventory(self, company_id: uuid.UUID, voucher: Voucher, user_id: uuid.UUID):
+        direction_map = {
+            VoucherType.PURCHASE: 1,
+            VoucherType.OPENING: 1,
+            VoucherType.SALES: -1,
+        }
+        direction = direction_map.get(voucher.voucher_type, 0)
+        if direction == 0:
+            return
+
+        # Reversing is like posting with opposite direction
+        reverse_direction = -direction
+
+        for entry in voucher.inventory_entries:
+            stmt = select(StockItem).where(and_(StockItem.id == entry.stock_item_id, StockItem.company_id == company_id)).with_for_update()
+            res = await self.db.execute(stmt)
+            item = res.scalar_one()
+
+            new_qty = Decimal(str(item.current_quantity)) + (Decimal(str(entry.quantity)) * reverse_direction)
+
+            if direction == 1: # Original was inward, reversal is outward-like
+                 current_val = Decimal(str(item.current_quantity)) * Decimal(str(item.average_cost))
+                 entry_val = Decimal(str(entry.quantity)) * Decimal(str(entry.rate))
+                 if new_qty > 0:
+                     item.average_cost = (current_val - entry_val) / new_qty
+
+            item.current_quantity = new_qty
+            item.updated_by = user_id
 
 
 class VoucherService:
@@ -44,7 +119,6 @@ class VoucherService:
         seq.last_serial += 1
 
         # Format TYPE/FY/SERIAL
-        # TYPE code (3 chars)
         type_codes = {
             VoucherType.SALES: "SAL",
             VoucherType.PURCHASE: "PUR",
@@ -56,8 +130,7 @@ class VoucherService:
         }
         type_code = type_codes.get(v_type, v_type.value[:3])
 
-        # FY code from name e.g. "2025-2026" -> "25-26"
-        fy_code = fy.name # Use as is if it's already "25-26", otherwise format
+        fy_code = fy.name
         if len(fy_code) == 9 and fy_code[4] == '-':
              fy_code = f"{fy_code[2:4]}-{fy_code[7:9]}"
 
@@ -72,7 +145,7 @@ class VoucherService:
         if fy.is_closed:
             raise HTTPException(status_code=400, detail="Financial Year is closed")
 
-        # Law 4: Company Isolation (Refs must belong to same company)
+        # Law 4: Company Isolation
         # Check ledgers
         from app.modules.masters.models import Ledger
         ledger_ids = [e.ledger_id for e in data.entries]
@@ -82,8 +155,14 @@ class VoucherService:
         if len(found_ledger_ids) != len(set(ledger_ids)):
             raise HTTPException(status_code=400, detail="One or more ledgers are invalid or belong to another company")
 
-        # Law 1 & 2: Double Entry & Min entries (Validated in schema but double check for min entries if needed)
-        # For Phase 5A we just create. Phase 5B will validate Dr=Cr on POST.
+        # Check stock items
+        if data.inventory_entries:
+            item_ids = [e.stock_item_id for e in data.inventory_entries]
+            stmt = select(StockItem.id).where(and_(StockItem.company_id == company_id, StockItem.id.in_(item_ids)))
+            res = await self.db.execute(stmt)
+            found_item_ids = [r for r in res.scalars().all()]
+            if len(found_item_ids) != len(set(item_ids)):
+                 raise HTTPException(status_code=400, detail="One or more stock items are invalid or belong to another company")
 
         # Generate number
         v_number = await self._generate_voucher_number(company_id, fy, data.voucher_type)
@@ -105,28 +184,54 @@ class VoucherService:
         for entry_data in data.entries:
             entry = VoucherEntry(
                 voucher_id=voucher.id,
-                **entry_data.model_dump()
+                **entry_data.model_dump(),
+                created_by=user_id,
+                updated_by=user_id
             )
             self.db.add(entry)
 
+        # Handle inventory entries
+        direction_map = {
+            VoucherType.PURCHASE: 1,
+            VoucherType.OPENING: 1,
+            VoucherType.SALES: -1,
+        }
+        direction = direction_map.get(data.voucher_type, 0)
+
+        for inv_data in data.inventory_entries:
+            inv_entry = InventoryTransaction(
+                voucher_id=voucher.id,
+                stock_item_id=inv_data.stock_item_id,
+                quantity=inv_data.quantity,
+                rate=inv_data.rate,
+                amount=inv_data.quantity * inv_data.rate,
+                direction=direction,
+                created_by=user_id,
+                updated_by=user_id
+            )
+            self.db.add(inv_entry)
+
         await self.db.commit()
-        await self.db.refresh(voucher)
-        # Load entries
-        stmt = select(Voucher).where(Voucher.id == voucher.id).options(
-            # relationship loading handled by relationship definitions usually,
-            # but let's be explicit if needed or just use refresh
-        )
+        await self.db.refresh(voucher, ["entries", "inventory_entries"])
         return voucher
 
     async def list_vouchers(self, company_id: uuid.UUID, fy_id: uuid.UUID) -> Sequence[Voucher]:
         stmt = select(Voucher).where(
             and_(Voucher.company_id == company_id, Voucher.financial_year_id == fy_id)
+        ).options(
+            selectinload(Voucher.entries),
+            selectinload(Voucher.inventory_entries)
         ).order_by(Voucher.voucher_date.desc(), Voucher.created_at.desc())
         result = await self.db.execute(stmt)
         return result.scalars().all()
 
     async def get_voucher(self, company_id: uuid.UUID, voucher_id: uuid.UUID) -> Voucher:
-        stmt = select(Voucher).where(and_(Voucher.id == voucher_id, Voucher.company_id == company_id))
+        stmt = select(Voucher).where(
+            and_(Voucher.id == voucher_id, Voucher.company_id == company_id)
+        ).options(
+            selectinload(Voucher.entries),
+            selectinload(Voucher.inventory_entries)
+        )
         result = await self.db.execute(stmt)
         voucher = result.scalar_one_or_none()
         if not voucher:
@@ -134,16 +239,17 @@ class VoucherService:
         return voucher
 
     async def post_voucher(self, company_id: uuid.UUID, voucher_id: uuid.UUID, user_id: uuid.UUID) -> Voucher:
+        # Load voucher
         voucher = await self.get_voucher(company_id, voucher_id)
 
         if voucher.status != VoucherStatus.DRAFT:
             raise HTTPException(status_code=400, detail=f"Cannot post voucher in {voucher.status} status")
 
         # Law 1: Double Entry Validation
-        total_debit = sum(e.debit_amount for e in voucher.entries)
-        total_credit = sum(e.credit_amount for e in voucher.entries)
+        total_debit = sum(Decimal(str(e.debit_amount)) for e in voucher.entries)
+        total_credit = sum(Decimal(str(e.credit_amount)) for e in voucher.entries)
 
-        if abs(total_debit - total_credit) > 0.001: # Handle precision
+        if abs(total_debit - total_credit) > Decimal("0.001"):
             raise HTTPException(status_code=400, detail=f"Voucher is not balanced. Total Dr: {total_debit}, Total Cr: {total_credit}")
 
         # Law 2: Minimum Entries
@@ -154,17 +260,21 @@ class VoucherService:
         voucher.status = VoucherStatus.POSTED
         voucher.updated_by = user_id
 
-        # Update Ledger Snapshots
+        # 1. Update Ledger Snapshots (Accounting Integration)
         from app.modules.masters.models import Ledger
         for entry in voucher.entries:
             stmt = select(Ledger).where(Ledger.id == entry.ledger_id).with_for_update()
             res = await self.db.execute(stmt)
             ledger = res.scalar_one()
-            ledger.current_balance += (entry.debit_amount - entry.credit_amount)
+            ledger.current_balance = Decimal(str(ledger.current_balance)) + (Decimal(str(entry.debit_amount)) - Decimal(str(entry.credit_amount)))
             ledger.updated_by = user_id
 
+        # 2. Update Stock Snapshots (Inventory Integration)
+        inv_service = InventoryPostingService(self.db)
+        await inv_service.post_inventory(company_id, voucher, user_id)
+
         await self.db.commit()
-        await self.db.refresh(voucher)
+        await self.db.refresh(voucher, ["entries", "inventory_entries"])
         return voucher
 
     async def cancel_voucher(self, company_id: uuid.UUID, voucher_id: uuid.UUID, user_id: uuid.UUID) -> Voucher:
@@ -173,19 +283,24 @@ class VoucherService:
         if voucher.status == VoucherStatus.CANCELLED:
             raise HTTPException(status_code=400, detail="Voucher is already cancelled")
 
-        # If it was posted, we need to reverse effects in snapshots
+        # Atomic Reversal Start
         if voucher.status == VoucherStatus.POSTED:
+            # 1. Reverse Ledger Snapshot effects
             from app.modules.masters.models import Ledger
             for entry in voucher.entries:
                 stmt = select(Ledger).where(Ledger.id == entry.ledger_id).with_for_update()
                 res = await self.db.execute(stmt)
                 ledger = res.scalar_one()
-                ledger.current_balance -= (entry.debit_amount - entry.credit_amount)
+                ledger.current_balance = Decimal(str(ledger.current_balance)) - (Decimal(str(entry.debit_amount)) - Decimal(str(entry.credit_amount)))
                 ledger.updated_by = user_id
+
+            # 2. Reverse Inventory Snapshot effects
+            inv_service = InventoryPostingService(self.db)
+            await inv_service.reverse_inventory(company_id, voucher, user_id)
 
         voucher.status = VoucherStatus.CANCELLED
         voucher.updated_by = user_id
 
         await self.db.commit()
-        await self.db.refresh(voucher)
+        await self.db.refresh(voucher, ["entries", "inventory_entries"])
         return voucher

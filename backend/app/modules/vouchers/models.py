@@ -24,13 +24,14 @@ class Voucher(Base, UUIDMixin, AuditMixin):
 
     # Relationships
     entries = relationship("VoucherEntry", back_populates="voucher", cascade="all, delete-orphan")
+    inventory_entries = relationship("InventoryTransaction", back_populates="voucher", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("company_id", "financial_year_id", "voucher_type", "voucher_number", name="uq_voucher_number"),
     )
 
 
-class VoucherEntry(Base, UUIDMixin):
+class VoucherEntry(Base, UUIDMixin, AuditMixin):
     __tablename__ = "voucher_entries"
 
     voucher_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vouchers.id", ondelete="CASCADE"), index=True)
@@ -46,7 +47,7 @@ class VoucherEntry(Base, UUIDMixin):
     ledger = relationship("app.modules.masters.models.Ledger")
 
 
-class InventoryTransaction(Base, UUIDMixin):
+class InventoryTransaction(Base, UUIDMixin, AuditMixin):
     __tablename__ = "inventory_transactions"
 
     voucher_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vouchers.id", ondelete="CASCADE"), index=True)
@@ -60,7 +61,7 @@ class InventoryTransaction(Base, UUIDMixin):
     direction: Mapped[int] = mapped_column(Integer)
 
     # Relationships
-    voucher = relationship("Voucher")
+    voucher = relationship("Voucher", back_populates="inventory_entries")
     stock_item = relationship("app.modules.masters.models.StockItem")
 
 

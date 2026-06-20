@@ -23,6 +23,25 @@ class VoucherEntryRead(VoucherEntryBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class InventoryEntryCreate(BaseModel):
+    stock_item_id: uuid.UUID
+    quantity: float = Field(..., gt=0)
+    rate: float = Field(..., ge=0)
+    narration: Optional[str] = None
+
+
+class InventoryEntryRead(BaseModel):
+    id: uuid.UUID
+    voucher_id: uuid.UUID
+    stock_item_id: uuid.UUID
+    quantity: float
+    rate: float
+    amount: float
+    direction: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class VoucherBase(BaseModel):
     voucher_type: VoucherType
     voucher_date: date = Field(default_factory=date.today)
@@ -32,6 +51,7 @@ class VoucherBase(BaseModel):
 class VoucherCreate(VoucherBase):
     # For Phase 5A, we allow creating with entries directly
     entries: List[VoucherEntryCreate] = Field(..., min_length=2)
+    inventory_entries: List[InventoryEntryCreate] = []
 
 
 class VoucherUpdate(BaseModel):
@@ -51,5 +71,6 @@ class VoucherRead(VoucherBase):
     updated_at: datetime
 
     entries: List[VoucherEntryRead] = []
+    inventory_entries: List[InventoryEntryRead] = []
 
     model_config = ConfigDict(from_attributes=True)

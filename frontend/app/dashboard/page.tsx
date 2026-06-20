@@ -27,7 +27,10 @@ export default function DashboardPage() {
         </div>
         <div className="space-x-2">
           <Button variant="outline" onClick={handleSwitchCompany}>Switch Company</Button>
-          <Button variant="destructive" onClick={() => logout()}>Logout</Button>
+          <Button variant="destructive" onClick={() => {
+            logout();
+            useCompanyStore.setState({ activeCompany: null, activeFY: null });
+          }}>Logout</Button>
         </div>
       </div>
 

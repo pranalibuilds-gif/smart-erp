@@ -21,6 +21,11 @@ apiClient.interceptors.request.use((config) => {
     config.headers["X-Company-ID"] = companyId;
   }
 
+  const fyId = useCompanyStore.getState().activeFY?.id;
+  if (fyId) {
+    config.headers["X-Financial-Year-ID"] = fyId;
+  }
+
   return config;
 });
 

@@ -16,8 +16,27 @@ export default function CompanySelectPage() {
     fetchCompanies();
   }, [fetchCompanies]);
 
-  const handleSelect = (company: Company) => {
+  const handleSelect = async (company: Company) => {
     setActiveCompany(company);
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/companies/${company.id}/financial-years`, {
+         headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth-storage') ? JSON.parse(localStorage.getItem('auth-storage')!).state.accessToken : ''}`
+         }
+      });
+      const data = await response.json();
+      if (data.success && data.data.length > 0) {
+        // Find latest open FY
+        const openFys = data.data.filter((f: any) => !f.is_closed);
+        if (openFys.length > 0) {
+           useCompanyStore.getState().setActiveFY(openFys[0]);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch FY", e);
+    }
+
     router.push("/dashboard");
   };
 

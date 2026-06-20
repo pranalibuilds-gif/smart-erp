@@ -14,13 +14,23 @@ export interface Company {
   country: string;
 }
 
+export interface FinancialYear {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_closed: boolean;
+}
+
 interface CompanyState {
   activeCompany: Company | null;
+  activeFY: FinancialYear | null;
   companies: Company[];
   isLoading: boolean;
 
   fetchCompanies: () => Promise<void>;
   setActiveCompany: (company: Company) => void;
+  setActiveFY: (fy: FinancialYear) => void;
   createCompany: (data: any) => Promise<Company>;
 }
 
@@ -28,6 +38,7 @@ export const useCompanyStore = create<CompanyState>()(
   persist(
     (set, get) => ({
       activeCompany: null,
+      activeFY: null,
       companies: [],
       isLoading: false,
 
@@ -44,6 +55,10 @@ export const useCompanyStore = create<CompanyState>()(
 
       setActiveCompany: (company: Company) => {
         set({ activeCompany: company });
+      },
+
+      setActiveFY: (fy: FinancialYear) => {
+        set({ activeFY: fy });
       },
 
       createCompany: async (data: any) => {

@@ -11,7 +11,8 @@ from alembic import context
 from app.core.config import settings
 from app.shared.database.base import Base
 # Import all models here so Alembic can see them
-# from app.modules.auth.models import User  # Example
+from app.modules.auth.models import User, Role, Permission, RolePermission, UserCompanyRole, RefreshToken
+from app.modules.companies.models import Company
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

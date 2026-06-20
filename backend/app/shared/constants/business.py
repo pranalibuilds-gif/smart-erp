@@ -14,6 +14,18 @@ class VoucherStatus(str, Enum):
     POSTED = "POSTED"
     CANCELLED = "CANCELLED"
 
+class DocumentType(str, Enum):
+    SALES = "SALES"
+    PURCHASE = "PURCHASE"
+    SALES_RETURN = "SALES_RETURN"
+    PURCHASE_RETURN = "PURCHASE_RETURN"
+    QUOTATION = "QUOTATION"
+
+class InvoiceStatus(str, Enum):
+    DRAFT = "DRAFT"
+    POSTED = "POSTED"
+    CANCELLED = "CANCELLED"
+
 class ItemType(str, Enum):
     PRODUCT = "PRODUCT"
     SERVICE = "SERVICE"

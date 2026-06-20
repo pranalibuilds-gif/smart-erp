@@ -15,6 +15,7 @@ from app.modules.companies.models import Company, FinancialYear
 from app.modules.masters.models import AccountGroup, Ledger, Unit, StockGroup, StockItem
 from app.modules.parties.models import Party
 from app.modules.vouchers.models import Voucher, VoucherEntry, VoucherSequence
+from app.modules.billing.models import Invoice, InvoiceItem
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

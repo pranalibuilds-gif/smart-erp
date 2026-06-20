@@ -1,0 +1,25 @@
+# IDEs
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+backend/.venv/
+env/
+venv/
+.env
+
+# Logs
+*.log
+backend/errors.log
+
+# Node (Future)
+node_modules/
+.next/
+dist/
+
+# System
+.DS_Store
+Thumbs.db

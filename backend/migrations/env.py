@@ -13,6 +13,7 @@ from app.shared.database.base import Base
 from app.modules.auth.models import User, Role, Permission, RolePermission, UserCompanyRole, RefreshToken
 from app.modules.companies.models import Company, FinancialYear
 from app.modules.masters.models import AccountGroup, Ledger, Unit, StockGroup, StockItem
+from app.modules.parties.models import Party
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -3,7 +3,7 @@ from sqlalchemy import String, ForeignKey, Boolean, Numeric, Enum, UniqueConstra
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.database.base import Base
 from app.shared.database.mixins import UUIDMixin, AuditMixin
-from app.shared.constants.business import AccountNature, BalanceType, ItemType
+from app.shared.constants.business import AccountNature, BalanceType, ItemType, LedgerType
 
 
 class AccountGroup(Base, UUIDMixin, AuditMixin):
@@ -33,6 +33,8 @@ class Ledger(Base, UUIDMixin, AuditMixin):
     opening_balance: Mapped[float] = mapped_column(Numeric(15, 2), default=0.00)
     opening_balance_type: Mapped[BalanceType] = mapped_column(Enum(BalanceType), default=BalanceType.DEBIT)
     current_balance: Mapped[float] = mapped_column(Numeric(15, 2), default=0.00)
+
+    ledger_type: Mapped[LedgerType] = mapped_column(Enum(LedgerType), default=LedgerType.GENERAL)
 
     is_system: Mapped[bool] = mapped_column(default=False)
     is_active: Mapped[bool] = mapped_column(default=True)

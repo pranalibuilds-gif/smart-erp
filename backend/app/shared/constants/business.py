@@ -39,3 +39,15 @@ class AccountNature(str, Enum):
 class BalanceType(str, Enum):
     DEBIT = "DEBIT"
     CREDIT = "CREDIT"
+
+class LedgerType(str, Enum):
+    GENERAL = "GENERAL"
+    CASH = "CASH"
+    BANK = "BANK"
+
+class ChequeStatus(str, Enum):
+    ISSUED = "ISSUED"
+    DEPOSITED = "DEPOSITED"
+    CLEARED = "CLEARED"
+    BOUNCED = "BOUNCED"
+    CANCELLED = "CANCELLED"

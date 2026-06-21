@@ -97,6 +97,7 @@ export default function DashboardPage() {
               <Button variant="link" className="p-0 h-auto justify-start" asChild><Link href="/reports/balance-sheet">Balance Sheet →</Link></Button>
               <Button variant="link" className="p-0 h-auto justify-start" asChild><Link href="/reports/stock-summary">Stock Summary →</Link></Button>
               <Button variant="link" className="p-0 h-auto justify-start" asChild><Link href="/reports/stock-by-warehouse">Stock By Warehouse →</Link></Button>
+              <Button variant="link" className="p-0 h-auto justify-start" asChild><Link href="/banking">Banking & Payments →</Link></Button>
            </CardContent>
         </Card>
         <Card>

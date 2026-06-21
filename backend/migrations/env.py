@@ -18,6 +18,7 @@ from app.modules.vouchers.models import Voucher, VoucherEntry, VoucherSequence, 
 from app.modules.billing.models import Invoice, InvoiceItem
 from app.modules.audit.models import AuditLog
 from app.modules.inventory.models import StockAdjustment, StockAdjustmentItem, StockTransfer, StockTransferItem
+from app.modules.banking.models import BankAccount, PaymentAllocation, BankStatement, BankStatementLine
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

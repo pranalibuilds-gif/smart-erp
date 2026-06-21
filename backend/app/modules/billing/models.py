@@ -39,6 +39,7 @@ class InvoiceItem(Base, UUIDMixin):
 
     invoice_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("invoices.id", ondelete="CASCADE"), index=True)
     stock_item_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("stock_items.id", ondelete="SET NULL"), index=True)
+    warehouse_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("warehouses.id", ondelete="SET NULL"), index=True)
 
     # Snapshots for immutability
     item_name: Mapped[str] = mapped_column(String(255))

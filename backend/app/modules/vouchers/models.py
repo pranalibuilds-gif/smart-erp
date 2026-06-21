@@ -51,6 +51,7 @@ class InventoryTransaction(Base, UUIDMixin, AuditMixin):
     __tablename__ = "inventory_transactions"
 
     voucher_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vouchers.id", ondelete="CASCADE"), index=True)
+    warehouse_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("warehouses.id", ondelete="RESTRICT"), index=True)
     stock_item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("stock_items.id", ondelete="RESTRICT"), index=True)
 
     quantity: Mapped[float] = mapped_column(Numeric(15, 3))
@@ -62,6 +63,7 @@ class InventoryTransaction(Base, UUIDMixin, AuditMixin):
 
     # Relationships
     voucher = relationship("Voucher", back_populates="inventory_entries")
+    warehouse = relationship("app.modules.masters.models.Warehouse")
     stock_item = relationship("app.modules.masters.models.StockItem")
 
 

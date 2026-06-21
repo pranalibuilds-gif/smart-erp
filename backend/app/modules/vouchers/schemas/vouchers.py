@@ -24,6 +24,7 @@ class VoucherEntryRead(VoucherEntryBase):
 
 
 class InventoryEntryCreate(BaseModel):
+    warehouse_id: uuid.UUID
     stock_item_id: uuid.UUID
     quantity: float = Field(..., gt=0)
     rate: float = Field(..., ge=0)
@@ -33,6 +34,7 @@ class InventoryEntryCreate(BaseModel):
 class InventoryEntryRead(BaseModel):
     id: uuid.UUID
     voucher_id: uuid.UUID
+    warehouse_id: uuid.UUID
     stock_item_id: uuid.UUID
     quantity: float
     rate: float

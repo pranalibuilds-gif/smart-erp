@@ -12,7 +12,7 @@ import { useEffect } from "react";
 export const InvoiceItemsTable = () => {
   const { control, register, watch, setValue } = useFormContext<InvoiceFormData>();
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
-  const { stockItems, fetchMasters } = useMasterStore();
+  const { stockItems, warehouses, fetchMasters } = useMasterStore();
 
   useEffect(() => {
     fetchMasters();
@@ -41,6 +41,7 @@ export const InvoiceItemsTable = () => {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[30%]">Item</TableHead>
+              <TableHead className="w-[15%]">Warehouse</TableHead>
               <TableHead className="text-right">Quantity</TableHead>
               <TableHead className="text-right">Rate</TableHead>
               <TableHead className="text-right">Tax %</TableHead>
@@ -70,6 +71,17 @@ export const InvoiceItemsTable = () => {
                       ))}
                     </select>
                     <Input placeholder="Description" {...register(`items.${index}.item_name` as const)} />
+                  </TableCell>
+                  <TableCell>
+                    <select
+                      className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm mb-1"
+                      {...register(`items.${index}.warehouse_id` as const)}
+                    >
+                      <option value="">Warehouse</option>
+                      {warehouses.map(w => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
                   </TableCell>
                   <TableCell>
                     <Input type="number" step="0.001" className="text-right" {...register(`items.${index}.quantity` as const)} />

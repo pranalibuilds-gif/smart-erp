@@ -14,6 +14,7 @@ from .schemas.ledgers import LedgerCreate, LedgerUpdate, LedgerRead
 from .schemas.units import UnitCreate, UnitUpdate, UnitRead
 from .schemas.stock_groups import StockGroupCreate, StockGroupUpdate, StockGroupRead
 from .schemas.stock_items import StockItemCreate, StockItemUpdate, StockItemRead
+from .schemas.warehouses import WarehouseCreate, WarehouseUpdate, WarehouseRead
 
 router = APIRouter(prefix="/masters", tags=["Masters"])
 
@@ -198,3 +199,27 @@ async def list_stock_items(
     service = MastersService(db)
     items = await service.get_stock_items(company.id)
     return StandardResponse(success=True, data=[StockItemRead.model_validate(i) for i in items])
+
+
+# --- Warehouses ---
+
+@router.post("/warehouses", response_model=StandardResponse[WarehouseRead], status_code=status.HTTP_201_CREATED)
+async def create_warehouse(
+    data: WarehouseCreate,
+    current_user: User = Depends(get_current_user),
+    company: Company = Depends(get_current_company),
+    db: AsyncSession = Depends(get_db)
+):
+    service = MastersService(db)
+    warehouse = await service.create_warehouse(company.id, current_user.id, data)
+    return StandardResponse(success=True, data=WarehouseRead.model_validate(warehouse), message="Warehouse created")
+
+
+@router.get("/warehouses", response_model=StandardResponse[List[WarehouseRead]])
+async def list_warehouses(
+    company: Company = Depends(get_current_company),
+    db: AsyncSession = Depends(get_db)
+):
+    service = MastersService(db)
+    warehouses = await service.list_warehouses(company.id)
+    return StandardResponse(success=True, data=[WarehouseRead.model_validate(w) for w in warehouses])

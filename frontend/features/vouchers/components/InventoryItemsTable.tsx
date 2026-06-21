@@ -12,7 +12,7 @@ import { VoucherType } from "../types";
 export const InventoryItemsTable = () => {
   const { control, register, watch } = useFormContext<VoucherFormData>();
   const { fields, append, remove } = useFieldArray({ control, name: "inventory_entries" });
-  const { stockItems } = useMasterStore();
+  const { stockItems, warehouses } = useMasterStore();
   const voucherType = watch("voucher_type");
 
   const inventorySupported = [VoucherType.SALES, VoucherType.PURCHASE, VoucherType.OPENING].includes(voucherType);
@@ -29,7 +29,8 @@ export const InventoryItemsTable = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40%]">Item</TableHead>
+              <TableHead className="w-[30%]">Item</TableHead>
+              <TableHead className="w-[20%]">Warehouse</TableHead>
               <TableHead className="text-right">Quantity</TableHead>
               <TableHead className="text-right">Rate</TableHead>
               <TableHead className="text-right">Amount</TableHead>
@@ -56,6 +57,17 @@ export const InventoryItemsTable = () => {
                     </select>
                   </TableCell>
                   <TableCell>
+                    <select
+                      className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                      {...register(`inventory_entries.${index}.warehouse_id` as const)}
+                    >
+                      <option value="">Select Warehouse</option>
+                      {warehouses.map(w => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                  </TableCell>
+                  <TableCell>
                     <Input type="number" step="0.001" className="text-right" {...register(`inventory_entries.${index}.quantity` as const)} />
                   </TableCell>
                   <TableCell>
@@ -73,7 +85,7 @@ export const InventoryItemsTable = () => {
           </TableBody>
           <TableHeader className="bg-gray-50 font-bold">
             <TableRow>
-              <TableCell colSpan={3} className="text-right">Inventory Total</TableCell>
+              <TableCell colSpan={4} className="text-right">Inventory Total</TableCell>
               <TableCell className="text-right font-mono text-green-600">{totalAmount.toFixed(2)}</TableCell>
               <TableCell></TableCell>
             </TableRow>
@@ -84,7 +96,7 @@ export const InventoryItemsTable = () => {
         type="button"
         variant="outline"
         size="sm"
-        onClick={() => append({ stock_item_id: "", quantity: 0, rate: 0 })}
+        onClick={() => append({ stock_item_id: "", warehouse_id: warehouses[0]?.id || "", quantity: 0, rate: 0 })}
       >
         <Plus className="mr-2 h-4 w-4" /> Add Item
       </Button>

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, ForeignKey, Boolean, Numeric, Enum
+from sqlalchemy import String, ForeignKey, Boolean, Numeric, Enum, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.database.base import Base
 from app.shared.database.mixins import UUIDMixin, AuditMixin
@@ -81,3 +81,32 @@ class StockItem(Base, UUIDMixin, AuditMixin):
     # Relationships
     stock_group = relationship("StockGroup")
     unit = relationship("Unit")
+
+
+class Warehouse(Base, UUIDMixin, AuditMixin):
+    __tablename__ = "warehouses"
+
+    company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    code: Mapped[str] = mapped_column(String(50), index=True)
+    address: Mapped[str | None] = mapped_column(String(500))
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+    __table_args__ = (
+        UniqueConstraint("company_id", "code", name="uq_warehouse_code_per_company"),
+        UniqueConstraint("company_id", "name", name="uq_warehouse_name_per_company"),
+    )
+
+
+class StockBalance(Base, UUIDMixin, AuditMixin):
+    __tablename__ = "stock_balances"
+
+    warehouse_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), index=True)
+    stock_item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("stock_items.id", ondelete="CASCADE"), index=True)
+
+    quantity: Mapped[float] = mapped_column(Numeric(15, 3), default=0.00)
+    average_cost: Mapped[float] = mapped_column(Numeric(15, 2), default=0.00)
+
+    __table_args__ = (
+        UniqueConstraint("warehouse_id", "stock_item_id", name="uq_stock_balance_per_warehouse"),
+    )

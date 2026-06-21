@@ -7,6 +7,7 @@ from app.shared.constants.business import DocumentType, InvoiceStatus
 
 class InvoiceItemBase(BaseModel):
     stock_item_id: Optional[uuid.UUID] = None
+    warehouse_id: Optional[uuid.UUID] = None
     item_name: str
     item_code: Optional[str] = None
     unit_name: Optional[str] = None

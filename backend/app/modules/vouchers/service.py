@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from .models import Voucher, VoucherEntry, VoucherSequence, InventoryTransaction
 from .schemas.vouchers import VoucherCreate, VoucherUpdate, InventoryEntryCreate
 from app.modules.companies.models import FinancialYear
-from app.modules.masters.models import StockItem
+from app.modules.masters.models import StockItem, Warehouse, StockBalance
 from app.modules.audit.service import AuditService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import VoucherType, VoucherStatus
@@ -34,28 +34,54 @@ class InventoryPostingService:
             return # This voucher type doesn't affect inventory
 
         for entry in voucher.inventory_entries:
-            # 1. Lock StockItem
-            stmt = select(StockItem).where(and_(StockItem.id == entry.stock_item_id, StockItem.company_id == company_id)).with_for_update()
-            res = await self.db.execute(stmt)
-            item = res.scalar_one()
+            # 1. Lock StockItem and StockBalance
+            stmt_item = select(StockItem).where(and_(StockItem.id == entry.stock_item_id, StockItem.company_id == company_id)).with_for_update()
+            res_item = await self.db.execute(stmt_item)
+            item = res_item.scalar_one()
 
-            # 2. Critical Law: No Negative Stock
-            new_qty = Decimal(str(item.current_quantity)) + (Decimal(str(entry.quantity)) * direction)
-            if new_qty < 0:
+            stmt_bal = select(StockBalance).where(
+                and_(StockBalance.warehouse_id == entry.warehouse_id, StockBalance.stock_item_id == entry.stock_item_id)
+            ).with_for_update()
+            res_bal = await self.db.execute(stmt_bal)
+            balance = res_bal.scalar_one_or_none()
+
+            if not balance:
+                balance = StockBalance(
+                    warehouse_id=entry.warehouse_id,
+                    stock_item_id=entry.stock_item_id,
+                    quantity=0.00,
+                    average_cost=0.00,
+                    created_by=user_id,
+                    updated_by=user_id
+                )
+                self.db.add(balance)
+
+            # 2. Critical Law: No Negative Stock (on warehouse level)
+            new_wh_qty = Decimal(str(balance.quantity)) + (Decimal(str(entry.quantity)) * direction)
+            if new_wh_qty < 0:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Negative stock not allowed for item '{item.name}'. Current: {item.current_quantity}, Requested: {entry.quantity}"
+                    detail=f"Negative stock not allowed in warehouse for item '{item.name}'. Current: {balance.quantity}, Requested: {entry.quantity}"
                 )
 
             # 3. Update Average Cost (WAC) for Inward
             if direction == 1:
-                # Formula: (Old Qty * Old Avg Cost + Incoming Qty * Incoming Rate) / (Old Qty + Incoming Qty)
-                total_value = (Decimal(str(item.current_quantity)) * Decimal(str(item.average_cost))) + (Decimal(str(entry.quantity)) * Decimal(str(entry.rate)))
-                if new_qty > 0:
-                    item.average_cost = total_value / new_qty
+                # Per warehouse WAC
+                total_value = (Decimal(str(balance.quantity)) * Decimal(str(balance.average_cost))) + (Decimal(str(entry.quantity)) * Decimal(str(entry.rate)))
+                if new_wh_qty > 0:
+                    balance.average_cost = total_value / new_wh_qty
+
+                # Company-wide WAC
+                new_total_qty = Decimal(str(item.current_quantity)) + Decimal(str(entry.quantity))
+                total_company_value = (Decimal(str(item.current_quantity)) * Decimal(str(item.average_cost))) + (Decimal(str(entry.quantity)) * Decimal(str(entry.rate)))
+                if new_total_qty > 0:
+                    item.average_cost = total_company_value / new_total_qty
 
             # 4. Update Quantity Cache
-            item.current_quantity = new_qty
+            balance.quantity = new_wh_qty
+            balance.updated_by = user_id
+
+            item.current_quantity = Decimal(str(item.current_quantity)) + (Decimal(str(entry.quantity)) * direction)
             item.updated_by = user_id
 
     async def reverse_inventory(self, company_id: uuid.UUID, voucher: Voucher, user_id: uuid.UUID):
@@ -72,19 +98,35 @@ class InventoryPostingService:
         reverse_direction = -direction
 
         for entry in voucher.inventory_entries:
-            stmt = select(StockItem).where(and_(StockItem.id == entry.stock_item_id, StockItem.company_id == company_id)).with_for_update()
-            res = await self.db.execute(stmt)
-            item = res.scalar_one()
+            # 1. Lock StockItem and StockBalance
+            stmt_item = select(StockItem).where(and_(StockItem.id == entry.stock_item_id, StockItem.company_id == company_id)).with_for_update()
+            res_item = await self.db.execute(stmt_item)
+            item = res_item.scalar_one()
 
-            new_qty = Decimal(str(item.current_quantity)) + (Decimal(str(entry.quantity)) * reverse_direction)
+            stmt_bal = select(StockBalance).where(
+                and_(StockBalance.warehouse_id == entry.warehouse_id, StockBalance.stock_item_id == entry.stock_item_id)
+            ).with_for_update()
+            res_bal = await self.db.execute(stmt_bal)
+            balance = res_bal.scalar_one()
+
+            new_wh_qty = Decimal(str(balance.quantity)) + (Decimal(str(entry.quantity)) * reverse_direction)
 
             if direction == 1: # Original was inward, reversal is outward-like
-                 current_val = Decimal(str(item.current_quantity)) * Decimal(str(item.average_cost))
+                 current_val = Decimal(str(balance.quantity)) * Decimal(str(balance.average_cost))
                  entry_val = Decimal(str(entry.quantity)) * Decimal(str(entry.rate))
-                 if new_qty > 0:
-                     item.average_cost = (current_val - entry_val) / new_qty
+                 if new_wh_qty > 0:
+                     balance.average_cost = (current_val - entry_val) / new_wh_qty
 
-            item.current_quantity = new_qty
+                 # Company wide reversal
+                 current_company_val = Decimal(str(item.current_quantity)) * Decimal(str(item.average_cost))
+                 new_company_qty = Decimal(str(item.current_quantity)) - Decimal(str(entry.quantity))
+                 if new_company_qty > 0:
+                      item.average_cost = (current_company_val - entry_val) / new_company_qty
+
+            balance.quantity = new_wh_qty
+            balance.updated_by = user_id
+
+            item.current_quantity = Decimal(str(item.current_quantity)) + (Decimal(str(entry.quantity)) * reverse_direction)
             item.updated_by = user_id
 
 
@@ -166,6 +208,14 @@ class VoucherService:
             if len(found_item_ids) != len(set(item_ids)):
                  raise HTTPException(status_code=400, detail="One or more stock items are invalid or belong to another company")
 
+            # Check warehouses
+            warehouse_ids = [e.warehouse_id for e in data.inventory_entries]
+            stmt = select(Warehouse.id).where(and_(Warehouse.company_id == company_id, Warehouse.id.in_(warehouse_ids)))
+            res = await self.db.execute(stmt)
+            found_wh_ids = [r for r in res.scalars().all()]
+            if len(found_wh_ids) != len(set(warehouse_ids)):
+                 raise HTTPException(status_code=400, detail="One or more warehouses are invalid or belong to another company")
+
         # Generate number
         v_number = await self._generate_voucher_number(company_id, fy, data.voucher_type)
 
@@ -203,6 +253,7 @@ class VoucherService:
         for inv_data in data.inventory_entries:
             inv_entry = InventoryTransaction(
                 voucher_id=voucher.id,
+                warehouse_id=inv_data.warehouse_id,
                 stock_item_id=inv_data.stock_item_id,
                 quantity=inv_data.quantity,
                 rate=inv_data.rate,

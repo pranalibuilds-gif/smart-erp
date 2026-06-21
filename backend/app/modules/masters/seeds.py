@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from .models import AccountGroup, Ledger, Unit
+from .models import AccountGroup, Ledger, Unit, Warehouse
 from app.shared.constants.business import AccountNature, BalanceType
 
 async def seed_company_defaults(db: AsyncSession, company_id: uuid.UUID, user_id: uuid.UUID):
@@ -71,5 +71,15 @@ async def seed_company_defaults(db: AsyncSession, company_id: uuid.UUID, user_id
             updated_by=user_id
         )
         db.add(unit)
+
+    # 4. Seed Main Warehouse
+    main_warehouse = Warehouse(
+        company_id=company_id,
+        name="Main Warehouse",
+        code="MAIN",
+        created_by=user_id,
+        updated_by=user_id
+    )
+    db.add(main_warehouse)
 
     await db.flush()

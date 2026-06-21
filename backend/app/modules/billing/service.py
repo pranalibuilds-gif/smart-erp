@@ -156,8 +156,11 @@ class InvoiceService:
         inventory_entries = []
         for item in invoice.items:
             if item.stock_item_id:
+                # Default to Main Warehouse if somehow missing, though it should be set
+                # For Phase 10 we expect warehouse_id on invoice item
                 inventory_entries.append(InventoryEntryCreate(
                     stock_item_id=item.stock_item_id,
+                    warehouse_id=item.warehouse_id,
                     quantity=item.quantity,
                     rate=item.rate,
                     narration=f"Ref: {invoice.invoice_number}"

@@ -4,12 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from fastapi import HTTPException, status
 
-from .models import AccountGroup, Ledger, Unit, StockGroup, StockItem
+from .models import AccountGroup, Ledger, Unit, StockGroup, StockItem, Warehouse, StockBalance
 from .schemas.account_groups import AccountGroupCreate, AccountGroupUpdate
 from .schemas.ledgers import LedgerCreate, LedgerUpdate
 from .schemas.units import UnitCreate, UnitUpdate
 from .schemas.stock_groups import StockGroupCreate, StockGroupUpdate
 from .schemas.stock_items import StockItemCreate, StockItemUpdate
+from .schemas.warehouses import WarehouseCreate, WarehouseUpdate
 from app.shared.database.repository import SQLAlchemyRepository
 
 
@@ -21,6 +22,7 @@ class MastersService:
         self.unit_repo = SQLAlchemyRepository(db, Unit)
         self.stock_group_repo = SQLAlchemyRepository(db, StockGroup)
         self.stock_item_repo = SQLAlchemyRepository(db, StockItem)
+        self.warehouse_repo = SQLAlchemyRepository(db, Warehouse)
 
     # --- Account Groups ---
 
@@ -239,3 +241,30 @@ class MastersService:
         stmt = select(StockItem).where(StockItem.company_id == company_id)
         result = await self.db.execute(stmt)
         return result.scalars().all()
+
+    # --- Warehouses ---
+
+    async def create_warehouse(self, company_id: uuid.UUID, user_id: uuid.UUID, data: WarehouseCreate) -> Warehouse:
+        # Check uniqueness manually to provide better errors
+        stmt = select(Warehouse).where(
+            and_(
+                Warehouse.company_id == company_id,
+                or_(Warehouse.name == data.name, Warehouse.code == data.code)
+            )
+        )
+        res = await self.db.execute(stmt)
+        if res.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Warehouse name or code already exists")
+
+        warehouse = Warehouse(
+            **data.model_dump(),
+            company_id=company_id,
+            created_by=user_id,
+            updated_by=user_id
+        )
+        return await self.warehouse_repo.create(warehouse)
+
+    async def list_warehouses(self, company_id: uuid.UUID) -> Sequence[Warehouse]:
+        stmt = select(Warehouse).where(and_(Warehouse.company_id == company_id, Warehouse.is_active == True))
+        res = await self.db.execute(stmt)
+        return res.scalars().all()

@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePartyStore } from "@/stores/party-store";
+import { Download } from "lucide-react";
+import apiClient from "@/lib/api-client";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -52,6 +54,24 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const handleDownloadPdf = async () => {
+    if (!invoice) return;
+    try {
+      const res = await apiClient.get(`/api/v1/billing/invoices/${invoice.id}/pdf`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `invoice_${invoice.invoice_number.replace(/\//g, '_')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err: any) {
+      alert("Failed to download PDF");
+    }
+  };
+
   if (loading) return <div className="p-8">Loading...</div>;
   if (!invoice) return <div className="p-8 text-red-500">Document not found</div>;
 
@@ -65,6 +85,11 @@ export default function InvoiceDetailPage() {
            <h1 className="text-3xl font-bold">{invoice.invoice_number}</h1>
         </div>
         <div className="space-x-4">
+           {invoice.status === InvoiceStatus.POSTED && (
+             <Button variant="outline" onClick={handleDownloadPdf}>
+                <Download className="h-4 w-4 mr-2" /> Download PDF
+             </Button>
+           )}
            {invoice.status === InvoiceStatus.DRAFT && (
              <Button onClick={handlePost} disabled={actionLoading}>Post & Generate Voucher</Button>
            )}

@@ -1,6 +1,6 @@
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.database.session import get_db
@@ -71,3 +71,21 @@ async def cancel_invoice(
     service = InvoiceService(db)
     invoice = await service.cancel_invoice(company.id, invoice_id, current_user.id)
     return StandardResponse(success=True, data=InvoiceRead.model_validate(invoice), message="Invoice cancelled")
+
+
+@router.get("/invoices/{invoice_id}/pdf")
+async def download_invoice_pdf(
+    invoice_id: uuid.UUID,
+    company: Company = Depends(get_current_company),
+    db: AsyncSession = Depends(get_db)
+):
+    service = InvoiceService(db)
+    pdf_out = await service.generate_invoice_pdf(company.id, invoice_id)
+
+    return Response(
+        content=pdf_out.getvalue(),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=invoice_{invoice_id}.pdf"
+        }
+    )

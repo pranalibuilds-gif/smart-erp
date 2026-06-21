@@ -1,4 +1,6 @@
 import uuid
+import io
+import os
 from decimal import Decimal
 from typing import List, Sequence
 from datetime import date
@@ -6,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
+from jinja2 import Environment, FileSystemLoader
+from xhtml2pdf import pisa
 
 from .models import Invoice, InvoiceItem
 from .schemas.invoices import InvoiceCreate, InvoiceUpdate
@@ -195,3 +199,29 @@ class InvoiceService:
         await self.db.commit()
         await self.db.refresh(invoice)
         return invoice
+
+    async def generate_invoice_pdf(self, company_id: uuid.UUID, invoice_id: uuid.UUID) -> io.BytesIO:
+        invoice = await self.get_invoice(company_id, invoice_id)
+        from app.modules.companies.models import Company
+        company = await self.db.get(Company, company_id)
+        party = await self.db.get(Party, invoice.party_id)
+
+        # Setup Jinja2
+        template_dir = os.path.join(os.path.dirname(__file__), "templates")
+        env = Environment(loader=FileSystemLoader(template_dir))
+        template = env.get_template("invoice.html")
+
+        html_out = template.render(
+            invoice=invoice,
+            company=company,
+            party=party
+        )
+
+        pdf_out = io.BytesIO()
+        pisa_status = pisa.CreatePDF(io.BytesIO(html_out.encode("utf-8")), dest=pdf_out)
+
+        if pisa_status.err:
+            raise HTTPException(status_code=500, detail="PDF generation failed")
+
+        pdf_out.seek(0)
+        return pdf_out

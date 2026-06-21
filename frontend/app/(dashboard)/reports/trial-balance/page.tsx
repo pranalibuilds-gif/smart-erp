@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { getTrialBalance } from "@/features/reports/api/reports-api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import Link from "next/link";
+import apiClient from "@/lib/api-client";
 
 export default function TrialBalancePage() {
   const [data, setData] = useState<any>(null);
@@ -16,11 +19,33 @@ export default function TrialBalancePage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleExportExcel = async () => {
+    try {
+      const res = await apiClient.get("/api/v1/reports/trial-balance/excel", {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'Trial_Balance.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert("Export failed");
+    }
+  };
+
   if (loading) return <div className="p-8">Loading...</div>;
 
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold mb-8">Trial Balance</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Trial Balance</h1>
+        <Button onClick={handleExportExcel} variant="outline">
+          <Download className="h-4 w-4 mr-2" /> Export to Excel
+        </Button>
+      </div>
 
       <Card>
         <CardContent className="p-0">

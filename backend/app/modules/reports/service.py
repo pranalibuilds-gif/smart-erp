@@ -1,16 +1,21 @@
 import uuid
+import io
 from decimal import Decimal
 from typing import List
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
 from .queries.trial_balance import get_trial_balance_data
 from .queries.general_ledger import get_ledger_entries
 from .queries.stock_summary import get_stock_summary_data
+from .queries.financial_statements import get_group_balances
 from .schemas.trial_balance import TrialBalanceItem, TrialBalanceResponse
 from .schemas.general_ledger import LedgerEntryItem, GeneralLedgerResponse
 from .schemas.stock_summary import StockSummaryItem, StockSummaryResponse
 from .schemas.dashboard import DashboardMetrics
+from .schemas.financial_statements import ProfitLossResponse, BalanceSheetResponse, FinancialStatementItem, BalanceSheetSection
 from app.modules.masters.models import Ledger
 
 
@@ -147,3 +152,107 @@ class ReportService:
             total_payables=0.0, # Placeholder
             inventory_value=stock.total_value
         )
+
+    async def get_profit_loss(self, company_id: uuid.UUID, fy_id: uuid.UUID) -> ProfitLossResponse:
+        data = await get_group_balances(self.db, company_id, fy_id)
+
+        income_items = []
+        expense_items = []
+        total_income = Decimal("0.00")
+        total_expense = Decimal("0.00")
+
+        for row in data:
+            bal = Decimal(str(row.balance))
+            if row.nature == "INCOME":
+                # Income usually has credit balance (negative in our Dr-Cr math)
+                abs_bal = -bal
+                income_items.append(FinancialStatementItem(name=row.group_name, amount=float(abs_bal)))
+                total_income += abs_bal
+            elif row.nature == "EXPENSE":
+                abs_bal = bal
+                expense_items.append(FinancialStatementItem(name=row.group_name, amount=float(abs_bal)))
+                total_expense += abs_bal
+
+        return ProfitLossResponse(
+            income=income_items,
+            expenses=expense_items,
+            total_income=float(total_income),
+            total_expenses=float(total_expense),
+            net_profit=float(total_income - total_expense)
+        )
+
+    async def get_balance_sheet(self, company_id: uuid.UUID, fy_id: uuid.UUID) -> BalanceSheetResponse:
+        data = await get_group_balances(self.db, company_id, fy_id)
+
+        assets = []
+        liabilities = []
+        equity = []
+        total_assets = Decimal("0.00")
+        total_liabilities = Decimal("0.00")
+        total_equity = Decimal("0.00")
+
+        for row in data:
+            bal = Decimal(str(row.balance))
+            if row.nature == "ASSET":
+                assets.append(FinancialStatementItem(name=row.group_name, amount=float(bal)))
+                total_assets += bal
+            elif row.nature == "LIABILITY":
+                # Liability usually has credit balance
+                abs_bal = -bal
+                liabilities.append(FinancialStatementItem(name=row.group_name, amount=float(abs_bal)))
+                total_liabilities += abs_bal
+            # TODO: Equity nature or special group for equity
+
+        # P&L Net Profit should be added to Equity/Reserves
+        pl = await self.get_profit_loss(company_id, fy_id)
+        equity.append(FinancialStatementItem(name="Profit & Loss A/c", amount=pl.net_profit))
+        total_equity += Decimal(str(pl.net_profit))
+
+        return BalanceSheetResponse(
+            assets=BalanceSheetSection(groups=assets, total=float(total_assets)),
+            liabilities=BalanceSheetSection(groups=liabilities, total=float(total_liabilities)),
+            equity=BalanceSheetSection(groups=equity, total=float(total_equity)),
+            is_balanced=abs(total_assets - (total_liabilities + total_equity)) < 0.01
+        )
+
+    async def export_trial_balance_excel(self, company_id: uuid.UUID, fy_id: uuid.UUID) -> io.BytesIO:
+        tb = await self.get_trial_balance(company_id, fy_id)
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Trial Balance"
+
+        # Headers
+        headers = ["Ledger Name", "Opening", "Debit", "Credit", "Closing"]
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center")
+
+        # Data
+        for item in tb.items:
+            ws.append([
+                item.ledger_name,
+                item.opening_balance,
+                item.debit_total,
+                item.credit_total,
+                item.closing_balance
+            ])
+
+        # Totals
+        ws.append([])
+        ws.append([
+            "TOTALS",
+            "",
+            tb.total_debit,
+            tb.total_credit,
+            ""
+        ])
+        last_row = ws.max_row
+        for cell in ws[last_row]:
+            cell.font = Font(bold=True)
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output

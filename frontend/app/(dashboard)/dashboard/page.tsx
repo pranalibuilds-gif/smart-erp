@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getDashboardMetrics } from "@/features/reports/api/reports-api";
-import { ShoppingCart, ShoppingBag, ArrowUpRight, ArrowDownRight, Package } from "lucide-react";
+import { ShoppingCart, ShoppingBag, ArrowUpRight, Package } from "lucide-react";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const { user, logout } = useAuthStore();
@@ -17,7 +18,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (activeCompany && activeFY) {
-      getDashboardMetrics().then(setMetrics);
+      getDashboardMetrics().then(setMetrics).catch(console.error);
     }
   }, [activeCompany, activeFY]);
 
@@ -90,16 +91,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <Card>
            <CardHeader><CardTitle>Reports</CardTitle></CardHeader>
-           <CardContent className="space-y-2">
-              <Button variant="link" className="p-0 block" asChild><Link href="/reports/trial-balance">Trial Balance →</Link></Button>
-              <Button variant="link" className="p-0 block" asChild><Link href="/reports/stock-summary">Stock Summary →</Link></Button>
+           <CardContent className="grid grid-cols-2 gap-2">
+              <Button variant="link" className="p-0 h-auto justify-start" asChild><Link href="/reports/trial-balance">Trial Balance →</Link></Button>
+              <Button variant="link" className="p-0 h-auto justify-start" asChild><Link href="/reports/profit-loss">Profit & Loss →</Link></Button>
+              <Button variant="link" className="p-0 h-auto justify-start" asChild><Link href="/reports/balance-sheet">Balance Sheet →</Link></Button>
+              <Button variant="link" className="p-0 h-auto justify-start" asChild><Link href="/reports/stock-summary">Stock Summary →</Link></Button>
            </CardContent>
         </Card>
         <Card>
            <CardHeader><CardTitle>Quick Links</CardTitle></CardHeader>
            <CardContent className="space-y-2">
-              <Button variant="link" className="p-0 block" asChild><Link href="/invoices/new">Create Invoice →</Link></Button>
-              <Button variant="link" className="p-0 block" asChild><Link href="/vouchers">View Vouchers →</Link></Button>
+              <Button variant="link" className="p-0 block h-auto justify-start" asChild><Link href="/invoices/new">Create Invoice →</Link></Button>
+              <Button variant="link" className="p-0 block h-auto justify-start" asChild><Link href="/vouchers">View Vouchers →</Link></Button>
            </CardContent>
         </Card>
       </div>

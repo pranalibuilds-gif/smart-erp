@@ -12,6 +12,7 @@ from .schemas.vouchers import VoucherCreate, VoucherUpdate, InventoryEntryCreate
 from app.modules.companies.models import FinancialYear
 from app.modules.masters.models import StockItem, Warehouse, StockBalance
 from app.modules.audit.service import AuditService
+from app.modules.notifications.service import NotificationService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import VoucherType, VoucherStatus
 
@@ -19,6 +20,7 @@ from app.shared.constants.business import VoucherType, VoucherStatus
 class InventoryPostingService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.notification_service = NotificationService(db)
 
     async def post_inventory(self, company_id: uuid.UUID, voucher: Voucher, user_id: uuid.UUID):
         # Determine direction based on voucher type
@@ -83,6 +85,16 @@ class InventoryPostingService:
 
             item.current_quantity = Decimal(str(item.current_quantity)) + (Decimal(str(entry.quantity)) * direction)
             item.updated_by = user_id
+
+            # Trigger: Low Stock
+            if item.current_quantity <= item.reorder_level:
+                await self.notification_service.publish_event(
+                    company_id=company_id,
+                    event_type="stock.low",
+                    entity_type="STOCK_ITEM",
+                    entity_id=item.id,
+                    payload={"item_name": item.name, "current_quantity": float(item.current_quantity)}
+                )
 
     async def reverse_inventory(self, company_id: uuid.UUID, voucher: Voucher, user_id: uuid.UUID):
         direction_map = {

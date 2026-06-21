@@ -10,6 +10,7 @@ from app.modules.reports.router import router as reports_router
 from app.modules.audit.router import router as audit_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.banking.router import router as banking_router
+from app.modules.notifications.router import router as notifications_router
 
 api_v1_router = APIRouter()
 
@@ -24,3 +25,4 @@ api_v1_router.include_router(reports_router)
 api_v1_router.include_router(audit_router)
 api_v1_router.include_router(inventory_router)
 api_v1_router.include_router(banking_router)
+api_v1_router.include_router(notifications_router)

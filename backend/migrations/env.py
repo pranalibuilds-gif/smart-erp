@@ -19,6 +19,7 @@ from app.modules.billing.models import Invoice, InvoiceItem
 from app.modules.audit.models import AuditLog
 from app.modules.inventory.models import StockAdjustment, StockAdjustmentItem, StockTransfer, StockTransferItem
 from app.modules.banking.models import BankAccount, PaymentAllocation, BankStatement, BankStatementLine
+from app.modules.notifications.models import DomainEvent, Notification, UserNotificationPreference
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

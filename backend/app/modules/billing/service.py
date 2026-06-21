@@ -18,6 +18,7 @@ from app.modules.parties.models import Party
 from app.modules.vouchers.service import VoucherService
 from app.modules.vouchers.schemas.vouchers import VoucherCreate, VoucherEntryCreate, InventoryEntryCreate
 from app.modules.audit.service import AuditService
+from app.modules.notifications.service import NotificationService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import DocumentType, InvoiceStatus, VoucherType
 
@@ -27,6 +28,7 @@ class InvoiceService:
         self.db = db
         self.invoice_repo = SQLAlchemyRepository(db, Invoice)
         self.audit_service = AuditService(db)
+        self.notification_service = NotificationService(db)
 
     async def _generate_invoice_number(self, company_id: uuid.UUID, fy: FinancialYear, doc_type: DocumentType) -> str:
         from sqlalchemy import func
@@ -201,6 +203,15 @@ class InvoiceService:
             entity_id=invoice.id,
             action="POST",
             new_values={"status": "POSTED", "voucher_id": str(voucher.id)}
+        )
+
+        # Trigger: Invoice Posted
+        await self.notification_service.publish_event(
+            company_id=company_id,
+            event_type="invoice.posted",
+            entity_type="INVOICE",
+            entity_id=invoice.id,
+            payload={"invoice_number": invoice.invoice_number, "total_amount": float(invoice.total_amount)}
         )
         await self.db.commit()
 

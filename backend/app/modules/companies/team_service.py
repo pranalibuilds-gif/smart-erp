@@ -12,6 +12,7 @@ from .models import CompanyInvitation
 from .schemas.team import CompanyInvitationCreate
 from app.modules.auth.models import User, Role, UserCompanyRole
 from app.modules.audit.service import AuditService
+from app.modules.notifications.service import NotificationService
 from app.shared.constants.business import InvitationStatus
 
 
@@ -19,6 +20,7 @@ class TeamService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.audit_service = AuditService(db)
+        self.notification_service = NotificationService(db)
 
     def _hash_token(self, token: str) -> str:
         return hashlib.sha256(token.encode()).hexdigest()
@@ -140,6 +142,15 @@ class TeamService:
             entity_id=user_id,
             action="JOIN",
             new_values={"invitation_id": str(invitation.id)}
+        )
+
+        # Trigger: Team Invite Accepted
+        await self.notification_service.publish_event(
+            company_id=invitation.company_id,
+            event_type="team.invite_accepted",
+            entity_type="USER",
+            entity_id=user_id,
+            payload={"email": invitation.email}
         )
         await self.db.commit()
 

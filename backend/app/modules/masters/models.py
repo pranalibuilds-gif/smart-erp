@@ -78,6 +78,8 @@ class StockItem(Base, UUIDMixin, AuditMixin):
     current_quantity: Mapped[float] = mapped_column(Numeric(15, 3), default=0.00)
     average_cost: Mapped[float] = mapped_column(Numeric(15, 2), default=0.00)
 
+    reorder_level: Mapped[float] = mapped_column(Numeric(15, 3), default=0.00)
+
     is_active: Mapped[bool] = mapped_column(default=True)
 
     # Relationships

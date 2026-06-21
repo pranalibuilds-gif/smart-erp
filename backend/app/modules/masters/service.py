@@ -11,6 +11,7 @@ from .schemas.units import UnitCreate, UnitUpdate
 from .schemas.stock_groups import StockGroupCreate, StockGroupUpdate
 from .schemas.stock_items import StockItemCreate, StockItemUpdate
 from .schemas.warehouses import WarehouseCreate, WarehouseUpdate
+from app.modules.search.service import SearchService
 from app.shared.database.repository import SQLAlchemyRepository
 
 
@@ -23,6 +24,7 @@ class MastersService:
         self.stock_group_repo = SQLAlchemyRepository(db, StockGroup)
         self.stock_item_repo = SQLAlchemyRepository(db, StockItem)
         self.warehouse_repo = SQLAlchemyRepository(db, Warehouse)
+        self.search_service = SearchService(db)
 
     # --- Account Groups ---
 
@@ -117,7 +119,20 @@ class MastersService:
         )
         # TODO: Option B - Create Opening Voucher
 
-        return await self.ledger_repo.create(ledger)
+        ledger = await self.ledger_repo.create(ledger)
+
+        # Index
+        await self.search_service.update_index(
+            company_id=company_id,
+            entity_type="LEDGER",
+            entity_id=ledger.id,
+            title=ledger.name,
+            subtitle="Ledger",
+            search_terms=[ledger.name, ledger.code or ""],
+            url=f"/masters/ledgers/{ledger.id}"
+        )
+
+        return ledger
 
     async def get_ledgers(self, company_id: uuid.UUID) -> Sequence[Ledger]:
         stmt = select(Ledger).where(Ledger.company_id == company_id)
@@ -235,7 +250,20 @@ class MastersService:
             created_by=user_id,
             updated_by=user_id
         )
-        return await self.stock_item_repo.create(item)
+        item = await self.stock_item_repo.create(item)
+
+        # Index
+        await self.search_service.update_index(
+            company_id=company_id,
+            entity_type="STOCK_ITEM",
+            entity_id=item.id,
+            title=item.name,
+            subtitle="Stock Item",
+            search_terms=[item.name, item.sku or ""],
+            url=f"/inventory/items/{item.id}"
+        )
+
+        return item
 
     async def get_stock_items(self, company_id: uuid.UUID) -> Sequence[StockItem]:
         stmt = select(StockItem).where(StockItem.company_id == company_id)

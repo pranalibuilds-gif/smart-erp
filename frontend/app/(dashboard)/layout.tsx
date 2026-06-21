@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/ui/sidebar";
 import { Header } from "@/components/ui/header";
+import { CommandPalette } from "@/components/ui/command-palette";
 import { ProtectedRoute } from "@/features/auth/guards/ProtectedRoute";
 
 export default function AppLayout({
@@ -18,6 +19,7 @@ export default function AppLayout({
           </main>
         </div>
       </div>
+      <CommandPalette />
     </ProtectedRoute>
   );
 }

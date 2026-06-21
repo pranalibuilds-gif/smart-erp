@@ -13,6 +13,7 @@ from app.modules.companies.models import FinancialYear
 from app.modules.masters.models import StockItem, Warehouse, StockBalance
 from app.modules.audit.service import AuditService
 from app.modules.notifications.service import NotificationService
+from app.modules.search.service import SearchService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import VoucherType, VoucherStatus
 
@@ -147,6 +148,7 @@ class VoucherService:
         self.db = db
         self.voucher_repo = SQLAlchemyRepository(db, Voucher)
         self.audit_service = AuditService(db)
+        self.search_service = SearchService(db)
 
     async def _generate_voucher_number(
         self, company_id: uuid.UUID, fy: FinancialYear, v_type: VoucherType
@@ -288,6 +290,17 @@ class VoucherService:
             action="CANCEL",
             new_values={"status": "CANCELLED"}
         )
+        # Index
+        await self.search_service.update_index(
+            company_id=company_id,
+            entity_type="VOUCHER",
+            entity_id=voucher.id,
+            title=voucher.voucher_number,
+            subtitle=f"{voucher.voucher_type} Voucher",
+            search_terms=[voucher.voucher_number, voucher.narration or ""],
+            url=f"/vouchers/{voucher.id}"
+        )
+
         await self.db.commit()
 
         return voucher
@@ -367,6 +380,17 @@ class VoucherService:
             action="CANCEL",
             new_values={"status": "CANCELLED"}
         )
+        # Index
+        await self.search_service.update_index(
+            company_id=company_id,
+            entity_type="VOUCHER",
+            entity_id=voucher.id,
+            title=voucher.voucher_number,
+            subtitle=f"{voucher.voucher_type} Voucher",
+            search_terms=[voucher.voucher_number, voucher.narration or ""],
+            url=f"/vouchers/{voucher.id}"
+        )
+
         await self.db.commit()
 
         return voucher
@@ -412,6 +436,17 @@ class VoucherService:
             action="CANCEL",
             new_values={"status": "CANCELLED"}
         )
+        # Index
+        await self.search_service.update_index(
+            company_id=company_id,
+            entity_type="VOUCHER",
+            entity_id=voucher.id,
+            title=voucher.voucher_number,
+            subtitle=f"{voucher.voucher_type} Voucher",
+            search_terms=[voucher.voucher_number, voucher.narration or ""],
+            url=f"/vouchers/{voucher.id}"
+        )
+
         await self.db.commit()
 
         return voucher

@@ -8,6 +8,7 @@ from .models import Party
 from .schemas.parties import PartyCreate, PartyUpdate
 from app.modules.masters.models import Ledger, AccountGroup
 from app.modules.audit.service import AuditService
+from app.modules.search.service import SearchService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import BalanceType
 
@@ -19,6 +20,7 @@ class PartyService:
         self.ledger_repo = SQLAlchemyRepository(db, Ledger)
         self.group_repo = SQLAlchemyRepository(db, AccountGroup)
         self.audit_service = AuditService(db)
+        self.search_service = SearchService(db)
 
     async def create_party(self, company_id: uuid.UUID, user_id: uuid.UUID, data: PartyCreate) -> Party:
         # Check if party name exists
@@ -73,6 +75,17 @@ class PartyService:
                 action="CREATE",
                 new_values={"name": party.name, "ledger_id": str(ledger.id)}
             )
+            # Index
+            await self.search_service.update_index(
+                company_id=company_id,
+                entity_type="PARTY",
+                entity_id=party.id,
+                title=party.name,
+                subtitle="Customer" if party.is_customer else "Supplier",
+                search_terms=[party.name, party.email or "", party.gst_number or ""],
+                url=f"/parties/{party.id}"
+            )
+
             await self.db.commit()
 
             return party

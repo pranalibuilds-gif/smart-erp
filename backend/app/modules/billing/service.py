@@ -19,6 +19,7 @@ from app.modules.vouchers.service import VoucherService
 from app.modules.vouchers.schemas.vouchers import VoucherCreate, VoucherEntryCreate, InventoryEntryCreate
 from app.modules.audit.service import AuditService
 from app.modules.notifications.service import NotificationService
+from app.modules.search.service import SearchService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import DocumentType, InvoiceStatus, VoucherType
 
@@ -29,6 +30,7 @@ class InvoiceService:
         self.invoice_repo = SQLAlchemyRepository(db, Invoice)
         self.audit_service = AuditService(db)
         self.notification_service = NotificationService(db)
+        self.search_service = SearchService(db)
 
     async def _generate_invoice_number(self, company_id: uuid.UUID, fy: FinancialYear, doc_type: DocumentType) -> str:
         from sqlalchemy import func
@@ -110,6 +112,17 @@ class InvoiceService:
                 "total_amount": float(invoice.total_amount)
             }
         )
+        # Index
+        await self.search_service.update_index(
+            company_id=company_id,
+            entity_type="INVOICE",
+            entity_id=invoice.id,
+            title=invoice.invoice_number,
+            subtitle="Sales Invoice" if invoice.document_type == DocumentType.SALES else "Purchase Invoice",
+            search_terms=[invoice.invoice_number, party.name],
+            url=f"/invoices/{invoice.id}"
+        )
+
         await self.db.commit()
 
         return invoice
@@ -213,6 +226,17 @@ class InvoiceService:
             entity_id=invoice.id,
             payload={"invoice_number": invoice.invoice_number, "total_amount": float(invoice.total_amount)}
         )
+        # Index
+        await self.search_service.update_index(
+            company_id=company_id,
+            entity_type="INVOICE",
+            entity_id=invoice.id,
+            title=invoice.invoice_number,
+            subtitle="Sales Invoice" if invoice.document_type == DocumentType.SALES else "Purchase Invoice",
+            search_terms=[invoice.invoice_number, party.name],
+            url=f"/invoices/{invoice.id}"
+        )
+
         await self.db.commit()
 
         return invoice
@@ -247,6 +271,17 @@ class InvoiceService:
             action="CANCEL",
             new_values={"status": "CANCELLED"}
         )
+        # Index
+        await self.search_service.update_index(
+            company_id=company_id,
+            entity_type="INVOICE",
+            entity_id=invoice.id,
+            title=invoice.invoice_number,
+            subtitle="Sales Invoice" if invoice.document_type == DocumentType.SALES else "Purchase Invoice",
+            search_terms=[invoice.invoice_number, party.name],
+            url=f"/invoices/{invoice.id}"
+        )
+
         await self.db.commit()
 
         return invoice

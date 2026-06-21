@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 import { useNotificationStore } from "@/stores/notification-store";
 import { useEffect, useState } from "react";
 import { Badge } from "./badge";
@@ -19,7 +19,18 @@ export function Header() {
   }, [fetchNotifications]);
 
   return (
-    <header className="h-16 border-b bg-white flex items-center justify-end px-8 relative">
+    <header className="h-16 border-b bg-white flex items-center justify-between px-8 relative">
+      <div className="flex-1 max-w-md">
+         <div
+           className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border rounded-md text-gray-400 text-sm cursor-pointer hover:bg-gray-100 transition-colors"
+           onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+         >
+            <Search className="h-4 w-4" />
+            <span>Search anything...</span>
+            <kbd className="ml-auto text-[10px] bg-white border px-1.5 py-0.5 rounded font-mono">Ctrl K</kbd>
+         </div>
+      </div>
+
       <div className="relative">
         <Button variant="ghost" size="icon" onClick={() => setShowDropdown(!showDropdown)}>
           <Bell className="h-5 w-5" />

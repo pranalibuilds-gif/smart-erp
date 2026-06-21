@@ -20,6 +20,8 @@ const menuItems = [
   { name: "Invoices", href: "/invoices", icon: FileText },
   { name: "Vouchers", href: "/vouchers", icon: Receipt },
   { name: "Parties", href: "/parties", icon: Users },
+  { name: "Stock Adjust", href: "/inventory/adjustments", icon: Settings },
+  { name: "Stock Transfer", href: "/inventory/transfers", icon: ArrowUpRight },
   { name: "Activity", href: "/activity", icon: History },
   { name: "Stock Summary", href: "/reports/stock-summary", icon: Package },
   { name: "Trial Balance", href: "/reports/trial-balance", icon: BarChart3 },

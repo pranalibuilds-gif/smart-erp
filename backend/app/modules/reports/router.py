@@ -12,6 +12,7 @@ from .schemas.general_ledger import GeneralLedgerResponse
 from .schemas.stock_summary import StockSummaryResponse
 from .schemas.dashboard import DashboardMetrics
 from .schemas.financial_statements import ProfitLossResponse, BalanceSheetResponse
+from .schemas.warehouse_reports import WarehouseStockResponse, TransferReportItem
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -99,3 +100,25 @@ async def export_trial_balance(
             "Content-Disposition": f"attachment; filename=trial_balance_{fy.name}.xlsx"
         }
     )
+
+
+@router.get("/warehouse-stock/{warehouse_id}", response_model=StandardResponse[WarehouseStockResponse])
+async def warehouse_stock(
+    warehouse_id: uuid.UUID,
+    company: Company = Depends(get_current_company),
+    db: AsyncSession = Depends(get_db)
+):
+    service = ReportService(db)
+    result = await service.get_warehouse_stock_report(company.id, warehouse_id)
+    return StandardResponse(success=True, data=result)
+
+
+@router.get("/transfer-history", response_model=StandardResponse[List[TransferReportItem]])
+async def transfer_history(
+    company: Company = Depends(get_current_company),
+    fy: FinancialYear = Depends(get_current_financial_year),
+    db: AsyncSession = Depends(get_db)
+):
+    service = ReportService(db)
+    result = await service.get_transfer_history_report(company.id, fy.id)
+    return StandardResponse(success=True, data=result)

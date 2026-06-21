@@ -14,6 +14,8 @@ async def seed_company_defaults(db: AsyncSession, company_id: uuid.UUID, user_id
         {"name": "Current Liabilities", "nature": AccountNature.LIABILITY, "is_primary": False, "parent": "Liabilities"},
         {"name": "Sundry Debtors", "nature": AccountNature.ASSET, "is_primary": False, "parent": "Current Assets"},
         {"name": "Sundry Creditors", "nature": AccountNature.LIABILITY, "is_primary": False, "parent": "Current Liabilities"},
+        {"name": "Indirect Income", "nature": AccountNature.INCOME, "is_primary": False, "parent": "Income"},
+        {"name": "Indirect Expense", "nature": AccountNature.EXPENSE, "is_primary": False, "parent": "Expenses"},
     ]
 
     groups = {}
@@ -39,6 +41,9 @@ async def seed_company_defaults(db: AsyncSession, company_id: uuid.UUID, user_id
         {"name": "Bank", "group": "Current Assets", "type": BalanceType.DEBIT},
         {"name": "Sales", "group": "Income", "type": BalanceType.CREDIT},
         {"name": "Purchase", "group": "Expenses", "type": BalanceType.DEBIT},
+        {"name": "Inventory", "group": "Current Assets", "type": BalanceType.DEBIT},
+        {"name": "Inventory Adjustment Gain", "group": "Indirect Income", "type": BalanceType.CREDIT},
+        {"name": "Inventory Adjustment Loss", "group": "Indirect Expense", "type": BalanceType.DEBIT},
     ]
 
     for l in ledgers_data:

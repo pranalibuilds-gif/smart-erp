@@ -4,7 +4,7 @@ from datetime import date
 from httpx import AsyncClient
 from app.shared.constants.business import DocumentType, InvoiceStatus, VoucherStatus
 from app.modules.companies.models import Company, FinancialYear
-from app.modules.masters.models import AccountGroup, Ledger, StockItem, Unit
+from app.modules.masters.models import AccountGroup, Ledger, StockItem, Unit, Warehouse
 from app.modules.parties.models import Party
 from app.core.security import create_access_token, hash_password
 from app.modules.auth.models import User, Role, UserCompanyRole
@@ -74,6 +74,11 @@ async def erp_seed(db):
     await db.flush()
     db.add(UserCompanyRole(user_id=user.id, company_id=company.id, role_id=role.id))
 
+    # Warehouse
+    warehouse = Warehouse(company_id=company.id, name="Main", code="MAIN")
+    db.add(warehouse)
+    await db.flush()
+
     await db.commit()
     return {
         "user": user,
@@ -81,6 +86,7 @@ async def erp_seed(db):
         "fy": fy,
         "party": party,
         "item": item,
+        "warehouse": warehouse,
         "sales_ledger": sales_ledger,
         "pur_ledger": pur_ledger
     }
@@ -98,6 +104,7 @@ async def test_complete_purchase_to_sale_flow(client: AsyncClient, erp_seed, db)
         "items": [
             {
                 "stock_item_id": str(erp_seed["item"].id),
+                "warehouse_id": str(erp_seed["warehouse"].id),
                 "item_name": "Widget",
                 "quantity": 100,
                 "rate": 10,
@@ -136,6 +143,7 @@ async def test_complete_purchase_to_sale_flow(client: AsyncClient, erp_seed, db)
         "items": [
             {
                 "stock_item_id": str(erp_seed["item"].id),
+                "warehouse_id": str(erp_seed["warehouse"].id),
                 "item_name": "Widget",
                 "quantity": 50,
                 "rate": 30, # Sale rate doesn't affect WAC

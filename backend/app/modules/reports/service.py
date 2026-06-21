@@ -11,12 +11,14 @@ from .queries.trial_balance import get_trial_balance_data
 from .queries.general_ledger import get_ledger_entries
 from .queries.stock_summary import get_stock_summary_data
 from .queries.financial_statements import get_group_balances
+from .queries.warehouse_reports import get_warehouse_stock, get_transfer_history
 from .schemas.trial_balance import TrialBalanceItem, TrialBalanceResponse
 from .schemas.general_ledger import LedgerEntryItem, GeneralLedgerResponse
 from .schemas.stock_summary import StockSummaryItem, StockSummaryResponse
 from .schemas.dashboard import DashboardMetrics
 from .schemas.financial_statements import ProfitLossResponse, BalanceSheetResponse, FinancialStatementItem, BalanceSheetSection
-from app.modules.masters.models import Ledger
+from .schemas.warehouse_reports import WarehouseStockResponse, WarehouseStockItem, TransferReportItem
+from app.modules.masters.models import Ledger, Warehouse
 
 
 class ReportService:
@@ -256,3 +258,41 @@ class ReportService:
         wb.save(output)
         output.seek(0)
         return output
+
+    async def get_warehouse_stock_report(self, company_id: uuid.UUID, warehouse_id: uuid.UUID) -> WarehouseStockResponse:
+        warehouse = await self.db.get(Warehouse, warehouse_id)
+        if not warehouse or warehouse.company_id != company_id:
+            raise HTTPException(status_code=404, detail="Warehouse not found")
+
+        rows = await get_warehouse_stock(self.db, company_id, warehouse_id)
+
+        items = []
+        total_val = Decimal("0.00")
+        for row in rows:
+            val = Decimal(str(row.quantity)) * Decimal(str(row.average_cost))
+            items.append(WarehouseStockItem(
+                item_id=row.item_id,
+                item_name=row.item_name,
+                quantity=float(row.quantity),
+                average_cost=float(row.average_cost),
+                value=float(val)
+            ))
+            total_val += val
+
+        return WarehouseStockResponse(
+            warehouse_name=warehouse.name,
+            items=items,
+            total_value=float(total_val)
+        )
+
+    async def get_transfer_history_report(self, company_id: uuid.UUID, fy_id: uuid.UUID) -> List[TransferReportItem]:
+        rows = await get_transfer_history(self.db, company_id, fy_id)
+        return [TransferReportItem(
+            id=row.id,
+            transfer_no=row.transfer_no,
+            date=row.date,
+            from_warehouse=row.from_warehouse,
+            to_warehouse=row.to_warehouse,
+            item_count=row.item_count,
+            status=row.status
+        ) for row in rows]

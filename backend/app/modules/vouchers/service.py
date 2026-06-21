@@ -36,7 +36,10 @@ class InventoryPostingService:
         if direction == 0:
             return # This voucher type doesn't affect inventory
 
-        for entry in voucher.inventory_entries:
+        # Hardening: Sort entries by stock_item_id + warehouse_id to prevent deadlocks
+        sorted_entries = sorted(voucher.inventory_entries, key=lambda e: (e.stock_item_id, e.warehouse_id))
+
+        for entry in sorted_entries:
             # 1. Lock StockItem and StockBalance
             stmt_item = select(StockItem).where(and_(StockItem.id == entry.stock_item_id, StockItem.company_id == company_id)).with_for_update()
             res_item = await self.db.execute(stmt_item)
@@ -110,7 +113,10 @@ class InventoryPostingService:
         # Reversing is like posting with opposite direction
         reverse_direction = -direction
 
-        for entry in voucher.inventory_entries:
+        # Hardening: Sort entries to prevent deadlocks
+        sorted_entries = sorted(voucher.inventory_entries, key=lambda e: (e.stock_item_id, e.warehouse_id))
+
+        for entry in sorted_entries:
             # 1. Lock StockItem and StockBalance
             stmt_item = select(StockItem).where(and_(StockItem.id == entry.stock_item_id, StockItem.company_id == company_id)).with_for_update()
             res_item = await self.db.execute(stmt_item)
@@ -166,13 +172,20 @@ class VoucherService:
         seq = result.scalar_one_or_none()
 
         if not seq:
-            seq = VoucherSequence(
-                company_id=company_id,
-                financial_year_id=fy.id,
-                voucher_type=v_type,
-                last_serial=0
-            )
-            self.db.add(seq)
+            try:
+                async with self.db.begin_nested():
+                    seq = VoucherSequence(
+                        company_id=company_id,
+                        financial_year_id=fy.id,
+                        voucher_type=v_type,
+                        last_serial=0
+                    )
+                    self.db.add(seq)
+                    await self.db.flush()
+            except Exception:
+                # Someone else created it in the meantime, fetch it again with lock
+                result = await self.db.execute(stmt)
+                seq = result.scalar_one()
 
         seq.last_serial += 1
 
@@ -287,8 +300,8 @@ class VoucherService:
             company_id=company_id,
             entity_type="VOUCHER",
             entity_id=voucher.id,
-            action="CANCEL",
-            new_values={"status": "CANCELLED"}
+            action="POST",
+            new_values={"status": "POSTED"}
         )
         # Index
         await self.search_service.update_index(
@@ -357,7 +370,9 @@ class VoucherService:
 
         # 1. Update Ledger Snapshots (Accounting Integration)
         from app.modules.masters.models import Ledger
-        for entry in voucher.entries:
+        # Hardening: Sort entries by ledger_id to prevent deadlocks
+        sorted_entries = sorted(voucher.entries, key=lambda e: e.ledger_id)
+        for entry in sorted_entries:
             stmt = select(Ledger).where(Ledger.id == entry.ledger_id).with_for_update()
             res = await self.db.execute(stmt)
             ledger = res.scalar_one()
@@ -377,8 +392,8 @@ class VoucherService:
             company_id=company_id,
             entity_type="VOUCHER",
             entity_id=voucher.id,
-            action="CANCEL",
-            new_values={"status": "CANCELLED"}
+            action="POST",
+            new_values={"status": "POSTED"}
         )
         # Index
         await self.search_service.update_index(
@@ -410,7 +425,9 @@ class VoucherService:
         if voucher.status == VoucherStatus.POSTED:
             # 1. Reverse Ledger Snapshot effects
             from app.modules.masters.models import Ledger
-            for entry in voucher.entries:
+            # Hardening: Sort entries by ledger_id to prevent deadlocks
+            sorted_entries = sorted(voucher.entries, key=lambda e: e.ledger_id)
+            for entry in sorted_entries:
                 stmt = select(Ledger).where(Ledger.id == entry.ledger_id).with_for_update()
                 res = await self.db.execute(stmt)
                 ledger = res.scalar_one()
@@ -433,8 +450,8 @@ class VoucherService:
             company_id=company_id,
             entity_type="VOUCHER",
             entity_id=voucher.id,
-            action="CANCEL",
-            new_values={"status": "CANCELLED"}
+            action="POST",
+            new_values={"status": "POSTED"}
         )
         # Index
         await self.search_service.update_index(

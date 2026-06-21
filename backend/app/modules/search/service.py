@@ -1,8 +1,11 @@
 import uuid
+import logging
 from typing import List, Sequence, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, delete
 from .models import SearchDocument
+
+logger = logging.getLogger(__name__)
 
 
 class SearchService:
@@ -19,25 +22,33 @@ class SearchService:
         search_terms: List[str],
         url: str
     ):
-        # Delete existing if any
-        stmt = delete(SearchDocument).where(and_(
-            SearchDocument.entity_type == entity_type,
-            SearchDocument.entity_id == entity_id
-        ))
-        await self.db.execute(stmt)
+        """
+        Updates search index for an entity.
+        Hardened: Failures don't break main transaction.
+        """
+        try:
+            async with self.db.begin_nested():
+                # Delete existing if any
+                stmt = delete(SearchDocument).where(and_(
+                    SearchDocument.entity_type == entity_type,
+                    SearchDocument.entity_id == entity_id
+                ))
+                await self.db.execute(stmt)
 
-        # Create new
-        doc = SearchDocument(
-            company_id=company_id,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            title=title,
-            subtitle=subtitle,
-            search_text=" ".join(filter(None, search_terms)).lower(),
-            url=url
-        )
-        self.db.add(doc)
-        await self.db.flush()
+                # Create new
+                doc = SearchDocument(
+                    company_id=company_id,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    title=title,
+                    subtitle=subtitle,
+                    search_text=" ".join(filter(None, search_terms)).lower(),
+                    url=url
+                )
+                self.db.add(doc)
+                await self.db.flush()
+        except Exception as e:
+            logger.warning(f"Search indexing failed for {entity_type} {entity_id}: {e}")
 
     async def search(self, company_id: uuid.UUID, query: str, limit: int = 10) -> Sequence[SearchDocument]:
         if not query:

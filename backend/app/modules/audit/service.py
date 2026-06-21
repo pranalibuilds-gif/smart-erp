@@ -1,9 +1,12 @@
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from .models import AuditLog
+
+logger = logging.getLogger(__name__)
 
 
 class AuditService:
@@ -21,27 +24,35 @@ class AuditService:
         new_values: Optional[Dict[str, Any]] = None,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None
-    ) -> AuditLog:
+    ) -> Optional[AuditLog]:
+        """
+        Logs a business action.
+        Hardened: Wrapped in a savepoint to ensure audit failures don't break main transaction.
+        """
         # Convert any non-serializable objects (like UUIDs or dates) to strings
         def sanitize(d: Optional[Dict[str, Any]]):
             if not d: return None
             return {k: str(v) if isinstance(v, (uuid.UUID, datetime)) else v for k, v in d.items()}
 
-        log = AuditLog(
-            user_id=user_id,
-            company_id=company_id,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            action=action,
-            old_values=sanitize(old_values),
-            new_values=sanitize(new_values),
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
-        self.db.add(log)
-        # We don't commit here usually, let the parent service handle it
-        await self.db.flush()
-        return log
+        try:
+            async with self.db.begin_nested():
+                log = AuditLog(
+                    user_id=user_id,
+                    company_id=company_id,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    action=action,
+                    old_values=sanitize(old_values),
+                    new_values=sanitize(new_values),
+                    ip_address=ip_address,
+                    user_agent=user_agent
+                )
+                self.db.add(log)
+                await self.db.flush()
+                return log
+        except Exception as e:
+            logger.warning(f"Audit logging failed: {e}")
+            return None
 
     async def get_logs(
         self,

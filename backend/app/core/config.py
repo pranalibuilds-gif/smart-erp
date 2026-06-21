@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     APP_DEBUG: bool = False
     API_V1_STR: str = "/api/v1"
 
+    # Workflow Settings
+    REORDER_ALERTS_ENABLED: bool = True
+
     # Database Settings
     POSTGRES_SERVER: str
     POSTGRES_USER: str

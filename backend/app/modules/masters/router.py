@@ -1,6 +1,6 @@
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.database.session import get_db
@@ -89,6 +89,19 @@ async def list_ledgers(
     service = MastersService(db)
     ledgers = await service.get_ledgers(company.id)
     return StandardResponse(success=True, data=[LedgerRead.model_validate(l) for l in ledgers])
+
+
+@router.get("/ledgers/{ledger_id}", response_model=StandardResponse[LedgerRead])
+async def get_ledger(
+    ledger_id: uuid.UUID,
+    company: Company = Depends(get_current_company),
+    db: AsyncSession = Depends(get_db)
+):
+    service = MastersService(db)
+    ledger = await service.ledger_repo.get(ledger_id)
+    if not ledger or ledger.company_id != company.id:
+        raise HTTPException(status_code=404, detail="Ledger not found")
+    return StandardResponse(success=True, data=LedgerRead.model_validate(ledger))
 
 
 @router.patch("/ledgers/{ledger_id}", response_model=StandardResponse[LedgerRead])

@@ -113,13 +113,14 @@ class InvoiceService:
             }
         )
         # Index
+        party = await self.db.get(Party, invoice.party_id)
         await self.search_service.update_index(
             company_id=company_id,
             entity_type="INVOICE",
             entity_id=invoice.id,
             title=invoice.invoice_number,
             subtitle="Sales Invoice" if invoice.document_type == DocumentType.SALES else "Purchase Invoice",
-            search_terms=[invoice.invoice_number, party.name],
+            search_terms=[invoice.invoice_number, party.name if party else ""],
             url=f"/invoices/{invoice.id}"
         )
 
@@ -227,13 +228,14 @@ class InvoiceService:
             payload={"invoice_number": invoice.invoice_number, "total_amount": float(invoice.total_amount)}
         )
         # Index
+        party = await self.db.get(Party, invoice.party_id)
         await self.search_service.update_index(
             company_id=company_id,
             entity_type="INVOICE",
             entity_id=invoice.id,
             title=invoice.invoice_number,
             subtitle="Sales Invoice" if invoice.document_type == DocumentType.SALES else "Purchase Invoice",
-            search_terms=[invoice.invoice_number, party.name],
+            search_terms=[invoice.invoice_number, party.name if party else ""],
             url=f"/invoices/{invoice.id}"
         )
 
@@ -272,13 +274,14 @@ class InvoiceService:
             new_values={"status": "CANCELLED"}
         )
         # Index
+        party = await self.db.get(Party, invoice.party_id)
         await self.search_service.update_index(
             company_id=company_id,
             entity_type="INVOICE",
             entity_id=invoice.id,
             title=invoice.invoice_number,
             subtitle="Sales Invoice" if invoice.document_type == DocumentType.SALES else "Purchase Invoice",
-            search_terms=[invoice.invoice_number, party.name],
+            search_terms=[invoice.invoice_number, party.name if party else ""],
             url=f"/invoices/{invoice.id}"
         )
 

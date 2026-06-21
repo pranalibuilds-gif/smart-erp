@@ -102,12 +102,19 @@ class ReportService:
         total_value = Decimal("0.00")
 
         for row in data:
-            opening_qty = 0.0 # TODO: handle opening stock
+            opening_qty = float(row.opening_qty)
             inward = float(row.inward_qty)
             outward = float(row.outward_qty)
             closing = opening_qty + inward - outward
 
-            avg_cost = Decimal(str(row.average_cost))
+            # Average cost logic: (Opening Value + Inward Value) / (Opening Qty + Inward Qty)
+            # Actually, WAC is computed during posting and cached.
+            # But si.average_cost is the LATEST company wide cost.
+            # For reporting, we use the cached average_cost from stock_items OR compute it.
+            # Let's use the row's average cost (which might need to be adjusted for period).
+
+            # Simple approach: use si.average_cost
+            avg_cost = Decimal(str(row.opening_avg_cost))
             value = Decimal(str(closing)) * avg_cost
 
             items.append(StockSummaryItem(

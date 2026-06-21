@@ -8,6 +8,7 @@ from app.shared.schemas.responses import StandardResponse
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from .service import CompanyService
+from .fy_service import FinancialYearService
 from .schemas import CompanyCreate, CompanyRead, FinancialYearRead
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
@@ -88,4 +89,20 @@ async def list_financial_years(
         success=True,
         data=[FinancialYearRead.model_validate(y) for y in years],
         message="Financial years retrieved successfully"
+    )
+
+
+@router.post("/{company_id}/financial-years/{fy_id}/close", response_model=StandardResponse[FinancialYearRead])
+async def close_financial_year(
+    company_id: uuid.UUID,
+    fy_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    service = FinancialYearService(db)
+    fy = await service.close_and_rollover(company_id, fy_id, current_user.id)
+    return StandardResponse(
+        success=True,
+        data=FinancialYearRead.model_validate(fy),
+        message="Financial year closed successfully and next year created"
     )

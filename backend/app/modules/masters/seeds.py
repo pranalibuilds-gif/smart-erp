@@ -39,6 +39,7 @@ async def seed_company_defaults(db: AsyncSession, company_id: uuid.UUID, user_id
     ledgers_data = [
         {"name": "Cash", "group": "Current Assets", "type": BalanceType.DEBIT},
         {"name": "Bank", "group": "Current Assets", "type": BalanceType.DEBIT},
+        {"name": "Capital", "group": "Liabilities", "type": BalanceType.CREDIT},
         {"name": "Sales", "group": "Income", "type": BalanceType.CREDIT},
         {"name": "Purchase", "group": "Expenses", "type": BalanceType.DEBIT},
         {"name": "Inventory", "group": "Current Assets", "type": BalanceType.DEBIT},

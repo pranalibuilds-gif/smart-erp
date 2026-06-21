@@ -131,6 +131,12 @@ class InvoiceService:
 
     async def post_invoice(self, company_id: uuid.UUID, invoice_id: uuid.UUID, user_id: uuid.UUID) -> Invoice:
         invoice = await self.get_invoice(company_id, invoice_id)
+
+        # FY Lock Check
+        fy = await self.db.get(FinancialYear, invoice.financial_year_id)
+        if fy.is_closed:
+            raise HTTPException(status_code=400, detail="Financial Year is closed")
+
         if invoice.status != InvoiceStatus.DRAFT:
             raise HTTPException(status_code=400, detail="Only draft invoices can be posted")
 
@@ -202,6 +208,12 @@ class InvoiceService:
 
     async def cancel_invoice(self, company_id: uuid.UUID, invoice_id: uuid.UUID, user_id: uuid.UUID) -> Invoice:
         invoice = await self.get_invoice(company_id, invoice_id)
+
+        # FY Lock Check
+        fy = await self.db.get(FinancialYear, invoice.financial_year_id)
+        if fy.is_closed:
+            raise HTTPException(status_code=400, detail="Financial Year is closed")
+
         if invoice.status == InvoiceStatus.CANCELLED:
             raise HTTPException(status_code=400, detail="Invoice already cancelled")
 

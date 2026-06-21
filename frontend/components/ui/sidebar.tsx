@@ -25,6 +25,7 @@ const menuItems = [
   { name: "Activity", href: "/activity", icon: History },
   { name: "Stock Summary", href: "/reports/stock-summary", icon: Package },
   { name: "Trial Balance", href: "/reports/trial-balance", icon: BarChart3 },
+  { name: "Settings", href: "/settings/financial-years", icon: Settings },
 ];
 
 export function Sidebar() {

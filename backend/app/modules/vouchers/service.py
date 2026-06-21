@@ -307,6 +307,11 @@ class VoucherService:
         # Load voucher
         voucher = await self.get_voucher(company_id, voucher_id)
 
+        # FY Lock Check
+        fy = await self.db.get(FinancialYear, voucher.financial_year_id)
+        if fy.is_closed:
+            raise HTTPException(status_code=400, detail="Financial Year is closed")
+
         if voucher.status != VoucherStatus.DRAFT:
             raise HTTPException(status_code=400, detail=f"Cannot post voucher in {voucher.status} status")
 
@@ -356,6 +361,11 @@ class VoucherService:
 
     async def cancel_voucher(self, company_id: uuid.UUID, voucher_id: uuid.UUID, user_id: uuid.UUID) -> Voucher:
         voucher = await self.get_voucher(company_id, voucher_id)
+
+        # FY Lock Check
+        fy = await self.db.get(FinancialYear, voucher.financial_year_id)
+        if fy.is_closed:
+            raise HTTPException(status_code=400, detail="Financial Year is closed")
 
         if voucher.status == VoucherStatus.CANCELLED:
             raise HTTPException(status_code=400, detail="Voucher is already cancelled")

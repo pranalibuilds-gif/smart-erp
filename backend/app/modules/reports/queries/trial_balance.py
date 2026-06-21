@@ -31,20 +31,21 @@ async def get_trial_balance_data(db: AsyncSession, company_id: uuid.UUID, fy_id:
     )
 
     # Wait, the above logic for filtering vouchers might exclude ledgers with no entries.
-    # Improved Query:
+    # Improved Query with snapshot support:
     query = text("""
         SELECT
             l.id as ledger_id,
             l.name as ledger_name,
-            l.opening_balance,
-            l.opening_balance_type,
+            COALESCE(fob.opening_balance, l.opening_balance) as opening_balance,
+            COALESCE(fob.balance_type, l.opening_balance_type) as opening_balance_type,
             COALESCE(SUM(ve.debit_amount), 0) as debit_total,
             COALESCE(SUM(ve.credit_amount), 0) as credit_total
         FROM ledgers l
+        LEFT JOIN fy_opening_balances fob ON fob.ledger_id = l.id AND fob.financial_year_id = :fy_id
         LEFT JOIN voucher_entries ve ON l.id = ve.ledger_id
         LEFT JOIN vouchers v ON v.id = ve.voucher_id AND v.status = 'POSTED' AND v.financial_year_id = :fy_id
         WHERE l.company_id = :company_id
-        GROUP BY l.id, l.name, l.opening_balance, l.opening_balance_type
+        GROUP BY l.id, l.name, fob.opening_balance, fob.balance_type, l.opening_balance, l.opening_balance_type
     """)
 
     result = await db.execute(query, {"company_id": company_id, "fy_id": fy_id})

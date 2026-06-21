@@ -11,13 +11,13 @@ from alembic import context
 from app.core.config import settings
 from app.shared.database.base import Base
 from app.modules.auth.models import User, Role, Permission, RolePermission, UserCompanyRole, RefreshToken
-from app.modules.companies.models import Company, FinancialYear
-from app.modules.masters.models import AccountGroup, Ledger, Unit, StockGroup, StockItem
+from app.modules.companies.models import Company, FinancialYear, FinancialYearOpeningBalance, FinancialYearStockOpening
+from app.modules.masters.models import AccountGroup, Ledger, Unit, StockGroup, StockItem, Warehouse, StockBalance
 from app.modules.parties.models import Party
-from app.modules.vouchers.models import Voucher, VoucherEntry, VoucherSequence
+from app.modules.vouchers.models import Voucher, VoucherEntry, VoucherSequence, InventoryTransaction
 from app.modules.billing.models import Invoice, InvoiceItem
 from app.modules.audit.models import AuditLog
-from app.modules.inventory.models import StockAdjustment, StockAdjustmentItem
+from app.modules.inventory.models import StockAdjustment, StockAdjustmentItem, StockTransfer, StockTransferItem
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -1,9 +1,10 @@
 import uuid
 from datetime import date
-from sqlalchemy import String, ForeignKey, Date, Boolean
+from sqlalchemy import String, ForeignKey, Date, Boolean, Numeric, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.database.base import Base
 from app.shared.database.mixins import UUIDMixin, AuditMixin
+from app.shared.constants.business import BalanceType
 
 
 class Company(Base, UUIDMixin, AuditMixin):
@@ -37,5 +38,28 @@ class FinancialYear(Base, UUIDMixin, AuditMixin):
     end_date: Mapped[date] = mapped_column(Date)
     is_closed: Mapped[bool] = mapped_column(default=False)
 
+    previous_fy_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("financial_years.id", ondelete="SET NULL"))
+
     # Relationships
     company = relationship("Company", back_populates="financial_years")
+
+
+class FinancialYearOpeningBalance(Base, UUIDMixin):
+    __tablename__ = "fy_opening_balances"
+
+    financial_year_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("financial_years.id", ondelete="CASCADE"), index=True)
+    ledger_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ledgers.id", ondelete="CASCADE"), index=True)
+
+    opening_balance: Mapped[float] = mapped_column(Numeric(15, 2))
+    balance_type: Mapped[BalanceType] = mapped_column(Enum(BalanceType))
+
+
+class FinancialYearStockOpening(Base, UUIDMixin):
+    __tablename__ = "fy_stock_openings"
+
+    financial_year_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("financial_years.id", ondelete="CASCADE"), index=True)
+    stock_item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("stock_items.id", ondelete="CASCADE"), index=True)
+    warehouse_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), index=True)
+
+    quantity: Mapped[float] = mapped_column(Numeric(15, 3))
+    average_cost: Mapped[float] = mapped_column(Numeric(15, 2))

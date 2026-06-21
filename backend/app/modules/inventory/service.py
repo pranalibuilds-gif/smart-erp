@@ -106,6 +106,12 @@ class StockAdjustmentService:
 
     async def post_adjustment(self, company_id: uuid.UUID, adj_id: uuid.UUID, user_id: uuid.UUID) -> StockAdjustment:
         adj = await self.get_adjustment(company_id, adj_id)
+
+        # FY Lock Check
+        fy = await self.db.get(FinancialYear, adj.financial_year_id)
+        if fy.is_closed:
+            raise HTTPException(status_code=400, detail="Financial Year is closed")
+
         if adj.status != InvoiceStatus.DRAFT:
             raise HTTPException(status_code=400, detail="Only draft adjustments can be posted")
 
@@ -208,6 +214,12 @@ class StockAdjustmentService:
 
     async def cancel_adjustment(self, company_id: uuid.UUID, adj_id: uuid.UUID, user_id: uuid.UUID) -> StockAdjustment:
         adj = await self.get_adjustment(company_id, adj_id)
+
+        # FY Lock Check
+        fy = await self.db.get(FinancialYear, adj.financial_year_id)
+        if fy.is_closed:
+            raise HTTPException(status_code=400, detail="Financial Year is closed")
+
         if adj.status == InvoiceStatus.CANCELLED:
             raise HTTPException(status_code=400, detail="Already cancelled")
 
@@ -310,6 +322,12 @@ class StockTransferService:
 
     async def post_transfer(self, company_id: uuid.UUID, trn_id: uuid.UUID, user_id: uuid.UUID) -> StockTransfer:
         trn = await self.get_transfer(company_id, trn_id)
+
+        # FY Lock Check
+        fy = await self.db.get(FinancialYear, trn.financial_year_id)
+        if fy.is_closed:
+            raise HTTPException(status_code=400, detail="Financial Year is closed")
+
         if trn.status != InvoiceStatus.DRAFT:
             raise HTTPException(status_code=400, detail="Only draft transfers can be posted")
 
@@ -369,6 +387,12 @@ class StockTransferService:
 
     async def cancel_transfer(self, company_id: uuid.UUID, trn_id: uuid.UUID, user_id: uuid.UUID) -> StockTransfer:
         trn = await self.get_transfer(company_id, trn_id)
+
+        # FY Lock Check
+        fy = await self.db.get(FinancialYear, trn.financial_year_id)
+        if fy.is_closed:
+            raise HTTPException(status_code=400, detail="Financial Year is closed")
+
         if trn.status != InvoiceStatus.POSTED:
              raise HTTPException(status_code=400, detail="Only posted transfers can be cancelled")
 

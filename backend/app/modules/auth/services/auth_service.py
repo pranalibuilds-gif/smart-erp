@@ -7,6 +7,7 @@ from app.modules.auth.models import User
 from app.modules.auth.repository import UserRepository
 from app.modules.auth.schemas import UserCreate, AuthResponse
 from app.modules.auth.services.session_service import SessionService
+from app.modules.audit.service import AuditService
 
 
 class AuthService:
@@ -14,6 +15,7 @@ class AuthService:
         self.db = db
         self.user_repo = UserRepository(db)
         self.session_service = SessionService(db)
+        self.audit_service = AuditService(db)
 
     async def register_user(
         self,
@@ -50,6 +52,18 @@ class AuthService:
         await self.db.commit()
         await self.db.refresh(new_user)
 
+        # Log action
+        await self.audit_service.log_action(
+            user_id=new_user.id,
+            company_id=None,
+            entity_type="USER",
+            entity_id=new_user.id,
+            action="REGISTER",
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        await self.db.commit()
+
         return AuthResponse(
             user=new_user,
             access_token=tokens.access_token,
@@ -78,12 +92,23 @@ class AuthService:
 
         if not user.is_active:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=status.HTTP_412_PRECONDITION_FAILED,
                 detail="User account is inactive"
             )
 
         tokens = await self.session_service.create_session(
             user.id, user_agent, ip_address
+        )
+
+        # Log action
+        await self.audit_service.log_action(
+            user_id=user.id,
+            company_id=None,
+            entity_type="USER",
+            entity_id=user.id,
+            action="LOGIN",
+            ip_address=ip_address,
+            user_agent=user_agent
         )
         await self.db.commit()
 

@@ -17,6 +17,7 @@ from app.modules.companies.models import FinancialYear
 from app.modules.parties.models import Party
 from app.modules.vouchers.service import VoucherService
 from app.modules.vouchers.schemas.vouchers import VoucherCreate, VoucherEntryCreate, InventoryEntryCreate
+from app.modules.audit.service import AuditService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import DocumentType, InvoiceStatus, VoucherType
 
@@ -25,9 +26,9 @@ class InvoiceService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.invoice_repo = SQLAlchemyRepository(db, Invoice)
+        self.audit_service = AuditService(db)
 
     async def _generate_invoice_number(self, company_id: uuid.UUID, fy: FinancialYear, doc_type: DocumentType) -> str:
-        # For simplicity, using a basic counter. In production, use a numbering scheme similar to vouchers.
         from sqlalchemy import func
         stmt = select(func.count(Invoice.id)).where(
             and_(
@@ -46,14 +47,12 @@ class InvoiceService:
         if fy.is_closed:
             raise HTTPException(status_code=400, detail="Financial Year is closed")
 
-        # Validate Party
         stmt = select(Party).where(and_(Party.id == data.party_id, Party.company_id == company_id))
         res = await self.db.execute(stmt)
         party = res.scalar_one_or_none()
         if not party:
             raise HTTPException(status_code=400, detail="Invalid party")
 
-        # Generate number
         inv_number = await self._generate_invoice_number(company_id, fy, data.document_type)
 
         invoice = Invoice(
@@ -96,6 +95,21 @@ class InvoiceService:
 
         await self.db.commit()
         await self.db.refresh(invoice, ["items"])
+
+        # Log action
+        await self.audit_service.log_action(
+            user_id=user_id,
+            company_id=company_id,
+            entity_type="INVOICE",
+            entity_id=invoice.id,
+            action="CREATE",
+            new_values={
+                "invoice_number": invoice.invoice_number,
+                "total_amount": float(invoice.total_amount)
+            }
+        )
+        await self.db.commit()
+
         return invoice
 
     async def list_invoices(self, company_id: uuid.UUID, fy_id: uuid.UUID) -> Sequence[Invoice]:
@@ -120,16 +134,9 @@ class InvoiceService:
         if invoice.status != InvoiceStatus.DRAFT:
             raise HTTPException(status_code=400, detail="Only draft invoices can be posted")
 
-        # 1. Prepare Voucher Data
         v_type = VoucherType.SALES if invoice.document_type == DocumentType.SALES else VoucherType.PURCHASE
-
-        # Determine Ledgers (In a real ERP, these are configurable)
-        # Sales: Dr Party, Cr Sales Account
-        # Purchase: Dr Purchase Account, Cr Party
-
         party = await self.db.get(Party, invoice.party_id)
 
-        # Find Sales/Purchase Ledger
         from app.modules.masters.models import Ledger
         ledger_name = "Sales" if invoice.document_type == DocumentType.SALES else "Purchase"
         stmt = select(Ledger).where(and_(Ledger.company_id == company_id, Ledger.name == ledger_name))
@@ -140,14 +147,10 @@ class InvoiceService:
 
         entries = []
         if invoice.document_type == DocumentType.SALES:
-            # Dr Party
             entries.append(VoucherEntryCreate(ledger_id=party.ledger_id, debit_amount=invoice.total_amount, credit_amount=0))
-            # Cr Sales
             entries.append(VoucherEntryCreate(ledger_id=trade_ledger.id, debit_amount=0, credit_amount=invoice.total_amount))
         else:
-            # Dr Purchase
             entries.append(VoucherEntryCreate(ledger_id=trade_ledger.id, debit_amount=invoice.total_amount, credit_amount=0))
-            # Cr Party
             entries.append(VoucherEntryCreate(ledger_id=party.ledger_id, debit_amount=0, credit_amount=invoice.total_amount))
 
         inventory_entries = []
@@ -160,7 +163,6 @@ class InvoiceService:
                     narration=f"Ref: {invoice.invoice_number}"
                 ))
 
-        # 2. Create and Post Voucher
         v_service = VoucherService(self.db)
         fy = await self.db.get(FinancialYear, invoice.financial_year_id)
 
@@ -175,13 +177,24 @@ class InvoiceService:
         voucher = await v_service.create_voucher(company_id, fy, user_id, v_data)
         await v_service.post_voucher(company_id, voucher.id, user_id)
 
-        # 3. Link Voucher and Update Status
         invoice.voucher_id = voucher.id
         invoice.status = InvoiceStatus.POSTED
         invoice.updated_by = user_id
 
         await self.db.commit()
         await self.db.refresh(invoice)
+
+        # Log action
+        await self.audit_service.log_action(
+            user_id=user_id,
+            company_id=company_id,
+            entity_type="INVOICE",
+            entity_id=invoice.id,
+            action="POST",
+            new_values={"status": "POSTED", "voucher_id": str(voucher.id)}
+        )
+        await self.db.commit()
+
         return invoice
 
     async def cancel_invoice(self, company_id: uuid.UUID, invoice_id: uuid.UUID, user_id: uuid.UUID) -> Invoice:
@@ -198,6 +211,18 @@ class InvoiceService:
 
         await self.db.commit()
         await self.db.refresh(invoice)
+
+        # Log action
+        await self.audit_service.log_action(
+            user_id=user_id,
+            company_id=company_id,
+            entity_type="INVOICE",
+            entity_id=invoice.id,
+            action="CANCEL",
+            new_values={"status": "CANCELLED"}
+        )
+        await self.db.commit()
+
         return invoice
 
     async def generate_invoice_pdf(self, company_id: uuid.UUID, invoice_id: uuid.UUID) -> io.BytesIO:

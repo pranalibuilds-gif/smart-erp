@@ -7,6 +7,7 @@ from app.modules.parties.router import router as parties_router
 from app.modules.vouchers.router import router as vouchers_router
 from app.modules.billing.router import router as billing_router
 from app.modules.reports.router import router as reports_router
+from app.modules.audit.router import router as audit_router
 
 api_v1_router = APIRouter()
 
@@ -18,3 +19,4 @@ api_v1_router.include_router(parties_router)
 api_v1_router.include_router(vouchers_router)
 api_v1_router.include_router(billing_router)
 api_v1_router.include_router(reports_router)
+api_v1_router.include_router(audit_router)

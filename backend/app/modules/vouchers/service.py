@@ -11,6 +11,7 @@ from .models import Voucher, VoucherEntry, VoucherSequence, InventoryTransaction
 from .schemas.vouchers import VoucherCreate, VoucherUpdate, InventoryEntryCreate
 from app.modules.companies.models import FinancialYear
 from app.modules.masters.models import StockItem
+from app.modules.audit.service import AuditService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import VoucherType, VoucherStatus
 
@@ -91,6 +92,7 @@ class VoucherService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.voucher_repo = SQLAlchemyRepository(db, Voucher)
+        self.audit_service = AuditService(db)
 
     async def _generate_voucher_number(
         self, company_id: uuid.UUID, fy: FinancialYear, v_type: VoucherType
@@ -213,6 +215,18 @@ class VoucherService:
 
         await self.db.commit()
         await self.db.refresh(voucher, ["entries", "inventory_entries"])
+
+        # Log action
+        await self.audit_service.log_action(
+            user_id=user_id,
+            company_id=company_id,
+            entity_type="VOUCHER",
+            entity_id=voucher.id,
+            action="CANCEL",
+            new_values={"status": "CANCELLED"}
+        )
+        await self.db.commit()
+
         return voucher
 
     async def list_vouchers(self, company_id: uuid.UUID, fy_id: uuid.UUID) -> Sequence[Voucher]:
@@ -275,6 +289,18 @@ class VoucherService:
 
         await self.db.commit()
         await self.db.refresh(voucher, ["entries", "inventory_entries"])
+
+        # Log action
+        await self.audit_service.log_action(
+            user_id=user_id,
+            company_id=company_id,
+            entity_type="VOUCHER",
+            entity_id=voucher.id,
+            action="CANCEL",
+            new_values={"status": "CANCELLED"}
+        )
+        await self.db.commit()
+
         return voucher
 
     async def cancel_voucher(self, company_id: uuid.UUID, voucher_id: uuid.UUID, user_id: uuid.UUID) -> Voucher:
@@ -303,4 +329,16 @@ class VoucherService:
 
         await self.db.commit()
         await self.db.refresh(voucher, ["entries", "inventory_entries"])
+
+        # Log action
+        await self.audit_service.log_action(
+            user_id=user_id,
+            company_id=company_id,
+            entity_type="VOUCHER",
+            entity_id=voucher.id,
+            action="CANCEL",
+            new_values={"status": "CANCELLED"}
+        )
+        await self.db.commit()
+
         return voucher

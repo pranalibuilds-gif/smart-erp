@@ -12,6 +12,7 @@ import {
   Package,
   Settings,
   Building2
+  History,
 } from "lucide-react";
 
 const menuItems = [
@@ -19,6 +20,7 @@ const menuItems = [
   { name: "Invoices", href: "/invoices", icon: FileText },
   { name: "Vouchers", href: "/vouchers", icon: Receipt },
   { name: "Parties", href: "/parties", icon: Users },
+  { name: "Activity", href: "/activity", icon: History },
   { name: "Stock Summary", href: "/reports/stock-summary", icon: Package },
   { name: "Trial Balance", href: "/reports/trial-balance", icon: BarChart3 },
 ];

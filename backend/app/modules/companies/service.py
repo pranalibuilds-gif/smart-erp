@@ -9,6 +9,7 @@ from .models import Company, FinancialYear
 from .schemas import CompanyCreate, CompanyUpdate
 from app.modules.auth.models import UserCompanyRole, Role, Permission
 from app.modules.masters.seeds import seed_company_defaults
+from app.modules.audit.service import AuditService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.permissions import ALL_PERMISSIONS
 
@@ -18,6 +19,7 @@ class CompanyService:
         self.db = db
         self.repo = SQLAlchemyRepository(db, Company)
         self.fy_repo = SQLAlchemyRepository(db, FinancialYear)
+        self.audit_service = AuditService(db)
 
     async def create_company(self, user_id: uuid.UUID, data: CompanyCreate) -> Company:
         # 1. Create Company
@@ -96,6 +98,18 @@ class CompanyService:
 
         await self.db.commit()
         await self.db.refresh(company)
+
+        # Log action
+        await self.audit_service.log_action(
+            user_id=user_id,
+            company_id=company.id,
+            entity_type="COMPANY",
+            entity_id=company.id,
+            action="CREATE",
+            new_values={"name": company.name, "slug": company.slug}
+        )
+        await self.db.commit()
+
         return company
 
     async def get_user_companies(self, user_id: uuid.UUID) -> List[Company]:

@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from .models import Party
 from .schemas.parties import PartyCreate, PartyUpdate
 from app.modules.masters.models import Ledger, AccountGroup
+from app.modules.audit.service import AuditService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import BalanceType
 
@@ -17,6 +18,7 @@ class PartyService:
         self.party_repo = SQLAlchemyRepository(db, Party)
         self.ledger_repo = SQLAlchemyRepository(db, Ledger)
         self.group_repo = SQLAlchemyRepository(db, AccountGroup)
+        self.audit_service = AuditService(db)
 
     async def create_party(self, company_id: uuid.UUID, user_id: uuid.UUID, data: PartyCreate) -> Party:
         # Check if party name exists
@@ -61,6 +63,18 @@ class PartyService:
         try:
             await self.db.commit()
             await self.db.refresh(party)
+
+            # Log action
+            await self.audit_service.log_action(
+                user_id=user_id,
+                company_id=company_id,
+                entity_type="PARTY",
+                entity_id=party.id,
+                action="CREATE",
+                new_values={"name": party.name, "ledger_id": str(ledger.id)}
+            )
+            await self.db.commit()
+
             return party
         except Exception as e:
             await self.db.rollback()

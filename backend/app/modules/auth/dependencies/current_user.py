@@ -67,4 +67,9 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Update last active
+    from datetime import datetime, timezone
+    user.last_active_at = datetime.now(timezone.utc)
+    await db.commit()
+
     return user

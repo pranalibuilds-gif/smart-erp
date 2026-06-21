@@ -51,3 +51,9 @@ class ChequeStatus(str, Enum):
     CLEARED = "CLEARED"
     BOUNCED = "BOUNCED"
     CANCELLED = "CANCELLED"
+
+class InvitationStatus(str, Enum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    EXPIRED = "EXPIRED"
+    REVOKED = "REVOKED"

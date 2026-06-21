@@ -9,7 +9,9 @@ from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from .service import CompanyService
 from .fy_service import FinancialYearService
+from .team_service import TeamService
 from .schemas import CompanyCreate, CompanyRead, FinancialYearRead
+from .schemas.team import CompanyInvitationCreate, CompanyInvitationRead, CompanyMemberRead
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
 
@@ -106,3 +108,57 @@ async def close_financial_year(
         data=FinancialYearRead.model_validate(fy),
         message="Financial year closed successfully and next year created"
     )
+
+
+# --- Team Management ---
+
+@router.get("/{company_id}/members", response_model=StandardResponse[List[CompanyMemberRead]])
+async def list_company_members(
+    company_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    service = TeamService(db)
+    members = await service.get_members(company_id)
+    return StandardResponse(success=True, data=members)
+
+
+@router.post("/{company_id}/invite", response_model=StandardResponse[dict])
+async def invite_user(
+    company_id: uuid.UUID,
+    data: CompanyInvitationCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    service = TeamService(db)
+    invitation, token = await service.invite_user(company_id, current_user.id, data)
+    # In a real app, we would email the token
+    return StandardResponse(success=True, data={"invitation_id": str(invitation.id), "token": token}, message="Invitation created")
+
+
+@router.get("/{company_id}/invitations", response_model=StandardResponse[List[CompanyInvitationRead]])
+async def list_invitations(
+    company_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    service = TeamService(db)
+    invites = await service.get_invitations(company_id)
+
+    data = []
+    for invite in invites:
+        read = CompanyInvitationRead.model_validate(invite)
+        if invite.role: read.role_name = invite.role.name
+        if invite.invited_by: read.invited_by_name = invite.invited_by.full_name
+        data.append(read)
+
+    return StandardResponse(success=True, data=data)
+
+
+@router.post("/invitations/accept")
+async def accept_invitation(
+    token: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    service = TeamService(db)
+    await service.accept_invitation(token, current_user.id)
+    return StandardResponse(success=True, message="Invitation accepted")

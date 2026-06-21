@@ -26,6 +26,7 @@ const menuItems = [
   { name: "Activity", href: "/activity", icon: History },
   { name: "Stock Summary", href: "/reports/stock-summary", icon: Package },
   { name: "Trial Balance", href: "/reports/trial-balance", icon: BarChart3 },
+  { name: "Team", href: "/settings/team", icon: Users },
   { name: "Settings", href: "/settings/financial-years", icon: Settings },
 ];
 

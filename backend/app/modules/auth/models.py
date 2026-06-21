@@ -33,6 +33,7 @@ class UserCompanyRole(Base):
     role_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("roles.id", ondelete="CASCADE"), nullable=False
     )
+    is_owner: Mapped[bool] = mapped_column(default=False)
 
 
 class Permission(Base, UUIDMixin, AuditMixin):
@@ -60,6 +61,8 @@ class User(Base, UUIDMixin, AuditMixin):
     full_name: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(default=True)
     is_superuser: Mapped[bool] = mapped_column(default=False)
+
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class RefreshToken(Base, UUIDMixin):

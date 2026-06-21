@@ -89,7 +89,8 @@ class CompanyService:
         user_company_role = UserCompanyRole(
             user_id=user_id,
             company_id=company.id,
-            role_id=admin_role.id
+            role_id=admin_role.id,
+            is_owner=True
         )
         self.db.add(user_company_role)
 

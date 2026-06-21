@@ -1,10 +1,10 @@
 import uuid
-from datetime import date
-from sqlalchemy import String, ForeignKey, Date, Boolean, Numeric, Enum
+from datetime import date, datetime
+from sqlalchemy import String, ForeignKey, Date, Boolean, Numeric, Enum, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.database.base import Base
 from app.shared.database.mixins import UUIDMixin, AuditMixin
-from app.shared.constants.business import BalanceType
+from app.shared.constants.business import BalanceType, InvitationStatus
 
 
 class Company(Base, UUIDMixin, AuditMixin):
@@ -63,3 +63,24 @@ class FinancialYearStockOpening(Base, UUIDMixin):
 
     quantity: Mapped[float] = mapped_column(Numeric(15, 3))
     average_cost: Mapped[float] = mapped_column(Numeric(15, 2))
+
+
+class CompanyInvitation(Base, UUIDMixin, AuditMixin):
+    __tablename__ = "company_invitations"
+
+    company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"))
+
+    token_hash: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    status: Mapped[InvitationStatus] = mapped_column(Enum(InvitationStatus), default=InvitationStatus.PENDING)
+
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    invited_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+
+    # Relationships
+    company = relationship("Company")
+    role = relationship("app.modules.auth.models.Role")
+    invited_by = relationship("app.modules.auth.models.User")

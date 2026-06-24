@@ -56,16 +56,26 @@ async def get_company(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    # Check if user has access (TODO: use permission guards)
-    # For now simple check
-    companies = await service.get_user_companies(current_user.id)
-    if company.id not in [c.id for c in companies]:
-         raise HTTPException(status_code=403, detail="Not enough permissions")
-
     return StandardResponse(
         success=True,
         data=CompanyRead.model_validate(company),
         message="Company retrieved successfully"
+    )
+
+
+@router.put("/{company_id}", response_model=StandardResponse[CompanyRead])
+async def update_company(
+    company_id: uuid.UUID,
+    data: CompanyUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    service = CompanyService(db)
+    company = await service.update_company(company_id, current_user.id, data)
+    return StandardResponse(
+        success=True,
+        data=CompanyRead.model_validate(company),
+        message="Company updated successfully"
     )
 
 @router.get("/{company_id}/financial-years", response_model=StandardResponse[List[FinancialYearRead]])

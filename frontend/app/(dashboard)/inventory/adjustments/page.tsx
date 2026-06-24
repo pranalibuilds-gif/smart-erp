@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Plus, Eye } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default function StockAdjustmentsPage() {
   const [items, setItems] = useState<StockAdjustment[]>([]);
@@ -20,11 +22,9 @@ export default function StockAdjustmentsPage() {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold">Stock Adjustments</h1>
-        <Button asChild>
-          <Link href="/inventory/adjustments/new">
-            <Plus className="mr-2 h-4 w-4" /> New Adjustment
-          </Link>
-        </Button>
+        <Link href="/inventory/adjustments/new" className={cn(buttonVariants(), "bg-blue-600 hover:bg-blue-700")}>
+          <Plus className="mr-2 h-4 w-4" /> New Adjustment
+        </Link>
       </div>
 
       {loading ? <div>Loading...</div> : (
@@ -49,9 +49,9 @@ export default function StockAdjustmentsPage() {
                     <Badge variant={item.status === 'POSTED' ? 'default' : 'secondary'}>{item.status}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/inventory/adjustments/${item.id}`}><Eye className="h-4 w-4" /></Link>
-                    </Button>
+                    <Link href={`/inventory/adjustments/${item.id}`} className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+                      <Eye className="h-4 w-4" />
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}

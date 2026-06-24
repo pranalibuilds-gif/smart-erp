@@ -5,10 +5,22 @@ import { useEffect, useState } from "react";
 import { getVoucher, postVoucher, cancelVoucher } from "@/features/vouchers/api/vouchers-api";
 import { Voucher, VoucherStatus } from "@/features/vouchers/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMasterStore } from "@/stores/master-store";
+import {
+  ArrowLeft,
+  Printer,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Receipt,
+  FileText,
+  CreditCard,
+  Package
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function VoucherDetailPage() {
   const { id } = useParams();
@@ -52,98 +64,156 @@ export default function VoucherDetailPage() {
     }
   };
 
-  if (loading) return <div className="p-8">Loading...</div>;
-  if (!voucher) return <div className="p-8 text-red-500">Voucher not found</div>;
+  if (loading) return <div className="p-8 flex justify-center items-center h-96 text-slate-400">Loading Voucher Details...</div>;
+  if (!voucher) return <div className="p-8 text-center text-red-500">Voucher not found</div>;
 
   const totalDebit = voucher.entries.reduce((sum, e) => sum + Number(e.debit_amount), 0);
+  const totalCredit = voucher.entries.reduce((sum, e) => sum + Number(e.credit_amount), 0);
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-           <Button variant="ghost" onClick={() => router.push("/vouchers")} className="mb-2">← Back to List</Button>
-           <h1 className="text-3xl font-bold">{voucher.voucher_number}</h1>
+    <div className="p-8 max-w-6xl mx-auto space-y-8 pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div className="space-y-4">
+          <Button variant="ghost" onClick={() => router.push("/vouchers")} className="text-slate-500 hover:text-slate-900 -ml-2">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Journal
+          </Button>
+          <div className="flex items-center gap-4">
+             <div className="bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-600/20">
+                <Receipt className="h-6 w-6 text-white" />
+             </div>
+             <div>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900">{voucher.voucher_number}</h1>
+                <p className="text-slate-500 font-medium">Recorded on {voucher.voucher_date}</p>
+             </div>
+          </div>
         </div>
-        <div className="space-x-4">
+
+        <div className="flex gap-3">
+           <Button variant="outline" className="bg-white">
+              <Printer className="mr-2 h-4 w-4" /> Print
+           </Button>
            {voucher.status === VoucherStatus.DRAFT && (
-             <Button onClick={handlePost} disabled={actionLoading}>
-                {actionLoading ? "Posting..." : "Post Voucher"}
+             <Button onClick={handlePost} disabled={actionLoading} className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200">
+                {actionLoading ? "Processing..." : <><CheckCircle2 className="mr-2 h-4 w-4" /> Post to Ledger</>}
              </Button>
            )}
            {voucher.status === VoucherStatus.POSTED && (
-             <Button variant="destructive" onClick={handleCancel} disabled={actionLoading}>
-                {actionLoading ? "Cancelling..." : "Cancel Voucher"}
+             <Button variant="destructive" onClick={handleCancel} disabled={actionLoading} className="shadow-lg shadow-rose-200">
+                {actionLoading ? "Processing..." : <><XCircle className="mr-2 h-4 w-4" /> Cancel Voucher</>}
              </Button>
            )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardHeader className="py-4"><CardTitle className="text-sm font-medium text-gray-500">Details</CardTitle></CardHeader>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <Card className="border-none shadow-sm ring-1 ring-slate-200">
+          <CardHeader className="pb-2"><CardDescription className="font-bold uppercase text-[10px] tracking-widest text-slate-500">Classification</CardDescription></CardHeader>
           <CardContent>
-            <div className="text-lg font-bold uppercase">{voucher.voucher_type}</div>
-            <div className="text-sm text-gray-600">Date: {voucher.voucher_date}</div>
+            <p className="text-xl font-bold text-slate-900">{voucher.voucher_type}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="py-4"><CardTitle className="text-sm font-medium text-gray-500">Status</CardTitle></CardHeader>
+
+        <Card className="border-none shadow-sm ring-1 ring-slate-200">
+          <CardHeader className="pb-2"><CardDescription className="font-bold uppercase text-[10px] tracking-widest text-slate-500">Status</CardDescription></CardHeader>
           <CardContent>
-            <Badge variant="secondary" className="text-lg uppercase px-3 py-1">{voucher.status}</Badge>
+             <Badge className={cn(
+               "text-sm font-bold",
+               voucher.status === VoucherStatus.POSTED && "bg-emerald-50 text-emerald-700 border-emerald-100",
+               voucher.status === VoucherStatus.CANCELLED && "bg-rose-50 text-rose-700 border-rose-100",
+               voucher.status === VoucherStatus.DRAFT && "bg-amber-50 text-amber-700 border-amber-100"
+             )} variant="outline">
+                {voucher.status === VoucherStatus.POSTED && <CheckCircle2 className="mr-1.5 h-3 w-3" />}
+                {voucher.status === VoucherStatus.CANCELLED && <XCircle className="mr-1.5 h-3 w-3" />}
+                {voucher.status === VoucherStatus.DRAFT && <Clock className="mr-1.5 h-3 w-3" />}
+                {voucher.status}
+             </Badge>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="py-4"><CardTitle className="text-sm font-medium text-gray-500">Total Amount</CardTitle></CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono">₹{totalDebit.toFixed(2)}</div>
+
+        <Card className="lg:col-span-2 border-none shadow-sm ring-1 ring-blue-600 bg-blue-600 text-white">
+          <CardHeader className="pb-2"><CardDescription className="font-bold uppercase text-[10px] tracking-widest text-blue-200">Total Transaction Value</CardDescription></CardHeader>
+          <CardContent className="flex items-center justify-between">
+            <h3 className="text-3xl font-bold">₹{totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
+            <CreditCard className="h-8 w-8 opacity-20" />
           </CardContent>
         </Card>
       </div>
 
-      <Card className="mb-8">
-        <CardHeader><CardTitle className="text-lg">Accounting Entries</CardTitle></CardHeader>
-        <CardContent>
+      <Card className="border-none shadow-sm ring-1 ring-slate-200 overflow-hidden">
+        <CardHeader className="bg-slate-50/50 border-b">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="h-5 w-5 text-blue-600" />
+            Accounting Entries
+          </CardTitle>
+          <CardDescription>Double-entry validation for this transaction</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ledger</TableHead>
-                <TableHead className="text-right">Debit</TableHead>
-                <TableHead className="text-right">Credit</TableHead>
+            <TableHeader className="bg-white border-b">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="font-bold text-slate-900 py-4">Account Ledger</TableHead>
+                <TableHead className="text-right font-bold text-slate-900">Debit (Dr)</TableHead>
+                <TableHead className="text-right font-bold text-slate-900">Credit (Cr)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {voucher.entries.map((e, i) => (
-                <TableRow key={i}>
-                  <TableCell>{ledgers.find(l => l.id === e.ledger_id)?.name || e.ledger_id}</TableCell>
-                  <TableCell className="text-right">{Number(e.debit_amount) > 0 ? Number(e.debit_amount).toFixed(2) : "-"}</TableCell>
-                  <TableCell className="text-right">{Number(e.credit_amount) > 0 ? Number(e.credit_amount).toFixed(2) : "-"}</TableCell>
+                <TableRow key={i} className="hover:bg-slate-50/50 transition-colors">
+                  <TableCell className="font-medium py-4">
+                     {ledgers.find(l => l.id === e.ledger_id)?.name || e.ledger_id}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-slate-700">
+                    {Number(e.debit_amount) > 0 ? `₹${Number(e.debit_amount).toLocaleString()}` : "—"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-slate-700">
+                    {Number(e.credit_amount) > 0 ? `₹${Number(e.credit_amount).toLocaleString()}` : "—"}
+                  </TableCell>
                 </TableRow>
               ))}
+              <TableRow className="bg-slate-50/50 font-bold hover:bg-slate-50/50">
+                <TableCell className="text-slate-900 py-4">Voucher Total</TableCell>
+                <TableCell className="text-right font-mono text-blue-700">₹{totalDebit.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-mono text-blue-700">₹{totalCredit.toLocaleString()}</TableCell>
+              </TableRow>
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
       {voucher.inventory_entries.length > 0 && (
-        <Card className="mb-8 border-dashed border-2">
-          <CardHeader><CardTitle className="text-lg">Inventory Transactions</CardTitle></CardHeader>
-          <CardContent>
+        <Card className="border-none shadow-sm ring-1 ring-slate-200 overflow-hidden border-t-4 border-t-orange-500">
+          <CardHeader className="bg-slate-50/50 border-b">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Package className="h-5 w-5 text-orange-500" />
+              Inventory Transactions
+            </CardTitle>
+            <CardDescription>Stock movements linked to this voucher</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+              <TableHeader className="bg-white border-b">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="font-bold text-slate-900 py-4">Stock Item</TableHead>
+                  <TableHead className="text-right font-bold text-slate-900">Quantity</TableHead>
+                  <TableHead className="text-right font-bold text-slate-900">Rate</TableHead>
+                  <TableHead className="text-right font-bold text-slate-900">Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {voucher.inventory_entries.map((e, i) => (
-                  <TableRow key={i}>
-                    <TableCell>{stockItems.find(item => item.id === e.stock_item_id)?.name || e.stock_item_id}</TableCell>
-                    <TableCell className="text-right">{Number(e.quantity).toFixed(3)}</TableCell>
-                    <TableCell className="text-right">{Number(e.rate).toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-bold">{Number(e.amount).toFixed(2)}</TableCell>
+                  <TableRow key={i} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="font-medium py-4">
+                       {stockItems.find(item => item.id === e.stock_item_id)?.name || e.stock_item_id}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-bold text-slate-700">
+                       {Number(e.quantity).toFixed(3)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-slate-500">
+                       ₹{Number(e.rate).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-bold text-orange-600">
+                       ₹{Number(e.amount).toLocaleString()}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -153,10 +223,10 @@ export default function VoucherDetailPage() {
       )}
 
       {voucher.narration && (
-        <Card>
-           <CardHeader><CardTitle className="text-sm font-medium text-gray-500">Narration</CardTitle></CardHeader>
-           <CardContent><p className="text-gray-700 italic">"{voucher.narration}"</p></CardContent>
-        </Card>
+        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 border-dashed">
+           <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Narration / Internal Notes</h4>
+           <p className="text-slate-600 italic leading-relaxed">"{voucher.narration}"</p>
+        </div>
       )}
     </div>
   );

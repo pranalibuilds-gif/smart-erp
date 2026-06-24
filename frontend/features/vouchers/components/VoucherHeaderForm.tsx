@@ -3,43 +3,36 @@
 import { useFormContext } from "react-hook-form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VoucherType } from "../types";
 import { VoucherFormData } from "../schemas";
 
 export const VoucherHeaderForm = () => {
-  const { register, setValue, watch, formState: { errors } } = useFormContext<VoucherFormData>();
-  const voucherType = watch("voucher_type");
+  const { register, watch, formState: { errors } } = useFormContext<VoucherFormData>();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <div className="space-y-2">
-        <Label>Voucher Type</Label>
-        <Select
-          value={voucherType}
-          onValueChange={(val) => setValue("voucher_type", val as VoucherType)}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+      <div className="space-y-2.5">
+        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Transaction Type</Label>
+        <select
+          className="w-full h-11 rounded-xl border-slate-200 bg-white px-3 text-sm font-semibold shadow-sm focus:ring-2 focus:ring-blue-500/10 outline-none"
+          {...register("voucher_type")}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Select type" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.values(VoucherType).map(type => (
-              <SelectItem key={type} value={type}>{type}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.voucher_type && <p className="text-xs text-red-500">{errors.voucher_type.message}</p>}
+          {Object.values(VoucherType).map(type => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
+        {errors.voucher_type && <p className="text-xs text-red-500 font-medium">{errors.voucher_type.message}</p>}
       </div>
 
-      <div className="space-y-2">
-        <Label>Voucher Date</Label>
-        <Input type="date" {...register("voucher_date")} />
-        {errors.voucher_date && <p className="text-xs text-red-500">{errors.voucher_date.message}</p>}
+      <div className="space-y-2.5">
+        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Voucher Date</Label>
+        <Input type="date" className="h-11 rounded-xl border-slate-200 bg-white" {...register("voucher_date")} />
+        {errors.voucher_date && <p className="text-xs text-red-500 font-medium">{errors.voucher_date.message}</p>}
       </div>
 
-      <div className="space-y-2">
-        <Label>Narration</Label>
-        <Input placeholder="General narration..." {...register("narration")} />
+      <div className="space-y-2.5">
+        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Narration / Remarks</Label>
+        <Input placeholder="Describe this transaction..." className="h-11 rounded-xl border-slate-200 bg-white" {...register("narration")} />
       </div>
     </div>
   );

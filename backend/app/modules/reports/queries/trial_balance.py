@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import select, func, and_, text
+from sqlalchemy import select, func, and_, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.masters.models import Ledger
 from app.modules.vouchers.models import Voucher, VoucherEntry

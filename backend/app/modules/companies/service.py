@@ -120,3 +120,31 @@ class CompanyService:
 
     async def get_company(self, company_id: uuid.UUID) -> Company | None:
         return await self.repo.get(company_id)
+
+    async def update_company(self, company_id: uuid.UUID, user_id: uuid.UUID, data: CompanyUpdate) -> Company:
+        company = await self.get_company(company_id)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        update_data = data.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(company, key, value)
+
+        company.updated_at = datetime.now()
+        company.updated_by = user_id
+
+        await self.db.commit()
+        await self.db.refresh(company)
+
+        # Log action
+        await self.audit_service.log_action(
+            user_id=user_id,
+            company_id=company.id,
+            entity_type="COMPANY",
+            entity_id=company.id,
+            action="UPDATE",
+            new_values=update_data
+        )
+        await self.db.commit()
+
+        return company

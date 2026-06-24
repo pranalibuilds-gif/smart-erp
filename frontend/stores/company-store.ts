@@ -32,6 +32,7 @@ interface CompanyState {
   setActiveCompany: (company: Company) => void;
   setActiveFY: (fy: FinancialYear) => void;
   createCompany: (data: any) => Promise<Company>;
+  updateCompany: (id: string, data: any) => Promise<Company>;
 }
 
 export const useCompanyStore = create<CompanyState>()(
@@ -71,6 +72,23 @@ export const useCompanyStore = create<CompanyState>()(
             isLoading: false
           }));
           return newCompany;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      updateCompany: async (id: string, data: any) => {
+        set({ isLoading: true });
+        try {
+          const response = await apiClient.put(`/api/v1/companies/${id}`, data);
+          const updated = response.data.data;
+          set((state) => ({
+            companies: state.companies.map(c => c.id === id ? updated : c),
+            activeCompany: state.activeCompany?.id === id ? updated : state.activeCompany,
+            isLoading: false
+          }));
+          return updated;
         } catch (error) {
           set({ isLoading: false });
           throw error;

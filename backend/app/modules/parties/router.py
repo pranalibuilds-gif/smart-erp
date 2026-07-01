@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.database.session import get_db
 from app.shared.schemas.responses import StandardResponse
-from app.modules.auth.dependencies import get_current_user, get_current_company
+from app.modules.auth.dependencies import get_current_user, get_current_company, PermissionRequired
 from app.modules.auth.models import User
 from app.modules.companies.models import Company
 from .service import PartyService
@@ -14,7 +14,12 @@ from .schemas.parties import PartyCreate, PartyUpdate, PartyRead
 router = APIRouter(prefix="/parties", tags=["Parties"])
 
 
-@router.post("", response_model=StandardResponse[PartyRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=StandardResponse[PartyRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("party:create"))]
+)
 async def create_party(
     data: PartyCreate,
     current_user: User = Depends(get_current_user),
@@ -26,7 +31,11 @@ async def create_party(
     return StandardResponse(success=True, data=PartyRead.model_validate(party), message="Party created successfully")
 
 
-@router.get("", response_model=StandardResponse[List[PartyRead]])
+@router.get(
+    "",
+    response_model=StandardResponse[List[PartyRead]],
+    dependencies=[Depends(PermissionRequired("party:view"))]
+)
 async def list_parties(
     party_type: str = Query("all", enum=["all", "customer", "supplier", "both"]),
     company: Company = Depends(get_current_company),
@@ -37,7 +46,11 @@ async def list_parties(
     return StandardResponse(success=True, data=[PartyRead.model_validate(p) for p in parties])
 
 
-@router.get("/{party_id}", response_model=StandardResponse[PartyRead])
+@router.get(
+    "/{party_id}",
+    response_model=StandardResponse[PartyRead],
+    dependencies=[Depends(PermissionRequired("party:view"))]
+)
 async def get_party(
     party_id: uuid.UUID,
     company: Company = Depends(get_current_company),
@@ -48,7 +61,11 @@ async def get_party(
     return StandardResponse(success=True, data=PartyRead.model_validate(party))
 
 
-@router.patch("/{party_id}", response_model=StandardResponse[PartyRead])
+@router.patch(
+    "/{party_id}",
+    response_model=StandardResponse[PartyRead],
+    dependencies=[Depends(PermissionRequired("party:update"))]
+)
 async def update_party(
     party_id: uuid.UUID,
     data: PartyUpdate,
@@ -61,7 +78,10 @@ async def update_party(
     return StandardResponse(success=True, data=PartyRead.model_validate(party))
 
 
-@router.delete("/{party_id}")
+@router.delete(
+    "/{party_id}",
+    dependencies=[Depends(PermissionRequired("party:delete"))]
+)
 async def delete_party(
     party_id: uuid.UUID,
     company: Company = Depends(get_current_company),

@@ -52,8 +52,11 @@ class FinancialYearService:
             raise HTTPException(status_code=400, detail="Cannot close year with draft stock transfers")
 
     async def close_and_rollover(self, company_id: uuid.UUID, fy_id: uuid.UUID, user_id: uuid.UUID) -> FinancialYear:
-        fy = await self.db.get(FinancialYear, fy_id)
-        if not fy or fy.company_id != company_id:
+        # Hardening: Lock FY row before validation to ensure atomicity
+        stmt = select(FinancialYear).where(and_(FinancialYear.id == fy_id, FinancialYear.company_id == company_id)).with_for_update()
+        res = await self.db.execute(stmt)
+        fy = res.scalar_one_or_none()
+        if not fy:
             raise HTTPException(status_code=404, detail="Financial Year not found")
 
         if fy.is_closed:
@@ -104,14 +107,6 @@ class FinancialYearService:
             balance = Decimal(str(ledger.current_balance))
 
             if nature in [AccountNature.INCOME, AccountNature.EXPENSE]:
-                # Add to net profit (Income is positive, Expense is negative if debit)
-                # Wait, current_balance logic: Debit - Credit.
-                # Income usually has Credit balance (negative current_balance).
-                # Expense usually has Debit balance (positive current_balance).
-                # Net Profit = sum(Income) - sum(Expense)
-                # If current_balance is Dr - Cr:
-                # Profit = -(sum(balance of income ledgers)) - (sum(balance of expense ledgers))?
-                # Actually, let's just subtract the balance from profit.
                 net_profit -= balance
 
                 # Opening for next year is 0
@@ -122,9 +117,12 @@ class FinancialYearService:
                     balance_type=BalanceType.DEBIT
                 )
                 self.db.add(op_bal)
+
+                # RESET current_balance for new year
+                ledger.current_balance = Decimal("0.00")
+                ledger.updated_by = user_id
             else:
                 # Asset/Liability: Carry forward
-                # If balance is positive -> DEBIT, negative -> CREDIT
                 abs_bal = abs(balance)
                 bal_type = BalanceType.DEBIT if balance >= 0 else BalanceType.CREDIT
 
@@ -136,15 +134,21 @@ class FinancialYearService:
                 )
                 self.db.add(op_bal)
 
-                # If this is the capital ledger, we'll update it later with net_profit
                 if ledger.id == capital_ledger.id:
                     capital_op_bal = op_bal
 
-        # 2.1 Transfer Net Profit to Capital Opening Balance
-        # net_profit is Dr - Cr for Income/Expense.
-        # If profit > 0 (Income > Expense), it should increase Capital (Credit balance).
-        # In our system, Credit is negative, Debit is positive.
-        # net_profit = sum(entries) = sum(Expense_Dr) - sum(Income_Cr).
+        # 2.1 Transfer Net Profit to Capital
+        current_cap_val = Decimal(str(capital_op_bal.opening_balance))
+        if capital_op_bal.balance_type == BalanceType.CREDIT:
+             current_cap_val = -current_cap_val
+
+        new_cap_val = current_cap_val - net_profit
+        capital_op_bal.opening_balance = float(abs(new_cap_val))
+        capital_op_bal.balance_type = BalanceType.DEBIT if new_cap_val >= 0 else BalanceType.CREDIT
+
+        # Update Capital global current_balance
+        capital_ledger.current_balance = new_cap_val
+        capital_ledger.updated_by = user_id
         # If profit > 0, then Expense > Income -> LOSS.
         # If profit < 0, then Income > Expense -> PROFIT.
 

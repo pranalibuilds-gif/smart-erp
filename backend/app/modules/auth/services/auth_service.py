@@ -27,7 +27,9 @@ class AuthService:
         Registers a new user and automatically logs them in.
         Transactional: User and Session created together.
         """
-        existing_user = await self.user_repo.get_by_email(user_in.email)
+        # Normalize email
+        email_normalized = user_in.email.lower().strip()
+        existing_user = await self.user_repo.get_by_email(email_normalized)
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -35,7 +37,7 @@ class AuthService:
             )
 
         new_user = User(
-            email=user_in.email,
+            email=email_normalized,
             hashed_password=hash_password(user_in.password),
             full_name=user_in.full_name,
             is_active=True
@@ -80,11 +82,22 @@ class AuthService:
     ):
         """
         Validates credentials and returns a new session.
-        Uses generic error messages to prevent enumeration.
+        Uses generic error messages and timing attack resistance.
         """
-        user = await self.user_repo.get_by_email(email)
+        # 1. Normalize
+        email_normalized = email.lower().strip()
 
-        if not user or not verify_password(password, user.hashed_password):
+        # 2. Lookup
+        user = await self.user_repo.get_by_email(email_normalized)
+
+        # 3. Secure verification (timing resistance)
+        # We use a dummy hash if user doesn't exist to ensure bcrypt runs either way
+        dummy_hash = "$2b$12$JQ5qK.7e1M4yF/H/nN.rkeH5.XzXp/7QZ/XW/e1.r.e.r.e.r.e.r."
+        stored_hash = user.hashed_password if user else dummy_hash
+
+        is_valid = verify_password(password, stored_hash)
+
+        if not user or not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"

@@ -1,14 +1,15 @@
 import uuid
 import io
 import os
+import logging
 from decimal import Decimal
 from typing import List, Sequence
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from fastapi import HTTPException
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from xhtml2pdf import pisa
 
 from .models import Invoice, InvoiceItem
@@ -22,6 +23,8 @@ from app.modules.notifications.service import NotificationService
 from app.modules.search.service import SearchService
 from app.shared.database.repository import SQLAlchemyRepository
 from app.shared.constants.business import DocumentType, InvoiceStatus, VoucherType
+
+logger = logging.getLogger(__name__)
 
 
 class InvoiceService:
@@ -131,14 +134,19 @@ class InvoiceService:
     async def list_invoices(self, company_id: uuid.UUID, fy_id: uuid.UUID) -> Sequence[Invoice]:
         stmt = select(Invoice).where(
             and_(Invoice.company_id == company_id, Invoice.financial_year_id == fy_id)
-        ).options(selectinload(Invoice.items)).order_by(Invoice.invoice_date.desc(), Invoice.created_at.desc())
+        ).options(
+            selectinload(Invoice.items),
+            joinedload(Invoice.party)
+        ).order_by(Invoice.invoice_date.desc(), Invoice.created_at.desc())
         result = await self.db.execute(stmt)
         return result.scalars().all()
 
-    async def get_invoice(self, company_id: uuid.UUID, invoice_id: uuid.UUID) -> Invoice:
+    async def get_invoice(self, company_id: uuid.UUID, invoice_id: uuid.UUID, for_update: bool = False) -> Invoice:
         stmt = select(Invoice).where(
             and_(Invoice.id == invoice_id, Invoice.company_id == company_id)
         ).options(selectinload(Invoice.items))
+        if for_update:
+            stmt = stmt.with_for_update()
         result = await self.db.execute(stmt)
         invoice = result.scalar_one_or_none()
         if not invoice:
@@ -146,7 +154,7 @@ class InvoiceService:
         return invoice
 
     async def post_invoice(self, company_id: uuid.UUID, invoice_id: uuid.UUID, user_id: uuid.UUID) -> Invoice:
-        invoice = await self.get_invoice(company_id, invoice_id)
+        invoice = await self.get_invoice(company_id, invoice_id, for_update=True)
 
         # FY Lock Check
         fy = await self.db.get(FinancialYear, invoice.financial_year_id)
@@ -199,12 +207,15 @@ class InvoiceService:
             inventory_entries=inventory_entries
         )
 
-        voucher = await v_service.create_voucher(company_id, fy, user_id, v_data)
-        await v_service.post_voucher(company_id, voucher.id, user_id)
+        # Atomically Create and Post Voucher WITHOUT committing yet
+        voucher = await v_service.create_voucher(company_id, fy, user_id, v_data, commit=False)
+        await v_service.post_voucher(company_id, voucher.id, user_id, commit=False)
 
         invoice.voucher_id = voucher.id
         invoice.status = InvoiceStatus.POSTED
         invoice.updated_by = user_id
+
+        await self.db.flush()
 
         await self.db.commit()
         await self.db.refresh(invoice)
@@ -220,31 +231,38 @@ class InvoiceService:
         )
 
         # Trigger: Invoice Posted
-        await self.notification_service.publish_event(
-            company_id=company_id,
-            event_type="invoice.posted",
-            entity_type="INVOICE",
-            entity_id=invoice.id,
-            payload={"invoice_number": invoice.invoice_number, "total_amount": float(invoice.total_amount)}
-        )
+        try:
+            await self.notification_service.publish_event(
+                company_id=company_id,
+                event_type="invoice.posted",
+                entity_type="INVOICE",
+                entity_id=invoice.id,
+                payload={"invoice_number": invoice.invoice_number, "total_amount": float(invoice.total_amount)}
+            )
+        except Exception as e:
+            logger.warning(f"Soft-fail: Notification failed during invoice post: {e}")
+
         # Index
-        party = await self.db.get(Party, invoice.party_id)
-        await self.search_service.update_index(
-            company_id=company_id,
-            entity_type="INVOICE",
-            entity_id=invoice.id,
-            title=invoice.invoice_number,
-            subtitle="Sales Invoice" if invoice.document_type == DocumentType.SALES else "Purchase Invoice",
-            search_terms=[invoice.invoice_number, party.name if party else ""],
-            url=f"/invoices/{invoice.id}"
-        )
+        try:
+            party = await self.db.get(Party, invoice.party_id)
+            await self.search_service.update_index(
+                company_id=company_id,
+                entity_type="INVOICE",
+                entity_id=invoice.id,
+                title=invoice.invoice_number,
+                subtitle="Sales Invoice" if invoice.document_type == DocumentType.SALES else "Purchase Invoice",
+                search_terms=[invoice.invoice_number, party.name if party else ""],
+                url=f"/invoices/{invoice.id}"
+            )
+        except Exception as e:
+            logger.warning(f"Soft-fail: Search indexing failed during invoice post: {e}")
 
         await self.db.commit()
 
         return invoice
 
     async def cancel_invoice(self, company_id: uuid.UUID, invoice_id: uuid.UUID, user_id: uuid.UUID) -> Invoice:
-        invoice = await self.get_invoice(company_id, invoice_id)
+        invoice = await self.get_invoice(company_id, invoice_id, for_update=True)
 
         # FY Lock Check
         fy = await self.db.get(FinancialYear, invoice.financial_year_id)
@@ -297,7 +315,11 @@ class InvoiceService:
 
         # Setup Jinja2
         template_dir = os.path.join(os.path.dirname(__file__), "templates")
-        env = Environment(loader=FileSystemLoader(template_dir))
+        # Setup Jinja2 with autoescaping
+        env = Environment(
+            loader=FileSystemLoader(template_dir),
+            autoescape=select_autoescape(['html', 'xml'])
+        )
         template = env.get_template("invoice.html")
 
         html_out = template.render(

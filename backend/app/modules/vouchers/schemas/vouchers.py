@@ -19,6 +19,7 @@ class VoucherEntryCreate(VoucherEntryBase):
 class VoucherEntryRead(VoucherEntryBase):
     id: uuid.UUID
     voucher_id: uuid.UUID
+    ledger_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,6 +29,7 @@ class InventoryEntryCreate(BaseModel):
     stock_item_id: uuid.UUID
     quantity: float = Field(..., gt=0)
     rate: float = Field(..., ge=0)
+    direction: Optional[int] = None # 1 for In, -1 for Out. If None, derived from VoucherType.
     narration: Optional[str] = None
 
 

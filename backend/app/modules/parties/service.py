@@ -82,7 +82,7 @@ class PartyService:
                 entity_id=party.id,
                 title=party.name,
                 subtitle="Customer" if party.is_customer else "Supplier",
-                search_terms=[party.name, party.email or "", party.gst_number or ""],
+                search_terms=[party.name, party.email or "", party.gstin or ""],
                 url=f"/parties/{party.id}"
             )
 

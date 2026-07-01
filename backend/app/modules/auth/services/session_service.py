@@ -72,7 +72,7 @@ class SessionService:
             raise ValueError("Invalid or expired refresh token")
 
         token_hash = hash_token(refresh_token)
-        stored_token = await self.repo.get_by_hash(token_hash)
+        stored_token = await self.repo.get_by_hash(token_hash, for_update=True)
 
         if not stored_token or stored_token.expires_at < datetime.now(timezone.utc):
             if stored_token:
@@ -86,7 +86,7 @@ class SessionService:
 
     async def revoke_session(self, refresh_token: str) -> None:
         token_hash = hash_token(refresh_token)
-        stored_token = await self.repo.get_by_hash(token_hash)
+        stored_token = await self.repo.get_by_hash(token_hash, for_update=True)
         if stored_token:
             await self.repo.revoke(stored_token.id)
             await self.db.commit()

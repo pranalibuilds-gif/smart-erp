@@ -23,7 +23,7 @@ class AuditLog(Base, UUIDMixin):
     ip_address: Mapped[str | None] = mapped_column(String(100))
     user_agent: Mapped[str | None] = mapped_column(String(500))
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     user = relationship("app.modules.auth.models.User")

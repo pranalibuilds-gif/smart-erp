@@ -1,6 +1,6 @@
 import uuid
 from datetime import date
-from sqlalchemy import String, ForeignKey, Date, Enum, Numeric, Integer
+from sqlalchemy import String, ForeignKey, Date, Enum, Numeric, Integer, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.database.base import Base
 from app.shared.database.mixins import UUIDMixin, AuditMixin
@@ -32,6 +32,10 @@ class Invoice(Base, UUIDMixin, AuditMixin):
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
     party = relationship("app.modules.parties.models.Party")
     voucher = relationship("app.modules.vouchers.models.Voucher")
+
+    __table_args__ = (
+        Index("ix_invoices_filtering", "company_id", "status"),
+    )
 
 
 class InvoiceItem(Base, UUIDMixin):

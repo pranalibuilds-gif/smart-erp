@@ -20,7 +20,12 @@ router = APIRouter(prefix="/masters", tags=["Masters"])
 
 # --- Account Groups ---
 
-@router.post("/account-groups", response_model=StandardResponse[AccountGroupRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/account-groups",
+    response_model=StandardResponse[AccountGroupRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def create_account_group(
     data: AccountGroupCreate,
     current_user: User = Depends(get_current_user),
@@ -32,7 +37,11 @@ async def create_account_group(
     return StandardResponse(success=True, data=AccountGroupRead.model_validate(group), message="Account group created")
 
 
-@router.get("/account-groups", response_model=StandardResponse[List[AccountGroupRead]])
+@router.get(
+    "/account-groups",
+    response_model=StandardResponse[List[AccountGroupRead]],
+    dependencies=[Depends(PermissionRequired("masters:view"))]
+)
 async def list_account_groups(
     root_only: bool = Query(False),
     company: Company = Depends(get_current_company),
@@ -43,7 +52,11 @@ async def list_account_groups(
     return StandardResponse(success=True, data=[AccountGroupRead.model_validate(g) for g in groups])
 
 
-@router.patch("/account-groups/{group_id}", response_model=StandardResponse[AccountGroupRead])
+@router.patch(
+    "/account-groups/{group_id}",
+    response_model=StandardResponse[AccountGroupRead],
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def update_account_group(
     group_id: uuid.UUID,
     data: AccountGroupUpdate,
@@ -56,7 +69,10 @@ async def update_account_group(
     return StandardResponse(success=True, data=AccountGroupRead.model_validate(group))
 
 
-@router.delete("/account-groups/{group_id}")
+@router.delete(
+    "/account-groups/{group_id}",
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def delete_account_group(
     group_id: uuid.UUID,
     company: Company = Depends(get_current_company),
@@ -69,7 +85,12 @@ async def delete_account_group(
 
 # --- Ledgers ---
 
-@router.post("/ledgers", response_model=StandardResponse[LedgerRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/ledgers",
+    response_model=StandardResponse[LedgerRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def create_ledger(
     data: LedgerCreate,
     current_user: User = Depends(get_current_user),
@@ -81,7 +102,11 @@ async def create_ledger(
     return StandardResponse(success=True, data=LedgerRead.model_validate(ledger), message="Ledger created")
 
 
-@router.get("/ledgers", response_model=StandardResponse[List[LedgerRead]])
+@router.get(
+    "/ledgers",
+    response_model=StandardResponse[List[LedgerRead]],
+    dependencies=[Depends(PermissionRequired("masters:view"))]
+)
 async def list_ledgers(
     company: Company = Depends(get_current_company),
     db: AsyncSession = Depends(get_db)
@@ -91,7 +116,11 @@ async def list_ledgers(
     return StandardResponse(success=True, data=[LedgerRead.model_validate(l) for l in ledgers])
 
 
-@router.get("/ledgers/{ledger_id}", response_model=StandardResponse[LedgerRead])
+@router.get(
+    "/ledgers/{ledger_id}",
+    response_model=StandardResponse[LedgerRead],
+    dependencies=[Depends(PermissionRequired("masters:view"))]
+)
 async def get_ledger(
     ledger_id: uuid.UUID,
     company: Company = Depends(get_current_company),
@@ -104,7 +133,11 @@ async def get_ledger(
     return StandardResponse(success=True, data=LedgerRead.model_validate(ledger))
 
 
-@router.patch("/ledgers/{ledger_id}", response_model=StandardResponse[LedgerRead])
+@router.patch(
+    "/ledgers/{ledger_id}",
+    response_model=StandardResponse[LedgerRead],
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def update_ledger(
     ledger_id: uuid.UUID,
     data: LedgerUpdate,
@@ -119,7 +152,12 @@ async def update_ledger(
 
 # --- Units ---
 
-@router.post("/units", response_model=StandardResponse[UnitRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/units",
+    response_model=StandardResponse[UnitRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def create_unit(
     data: UnitCreate,
     current_user: User = Depends(get_current_user),
@@ -131,7 +169,11 @@ async def create_unit(
     return StandardResponse(success=True, data=UnitRead.model_validate(unit), message="Unit created")
 
 
-@router.get("/units", response_model=StandardResponse[List[UnitRead]])
+@router.get(
+    "/units",
+    response_model=StandardResponse[List[UnitRead]],
+    dependencies=[Depends(PermissionRequired("masters:view"))]
+)
 async def list_units(
     company: Company = Depends(get_current_company),
     db: AsyncSession = Depends(get_db)
@@ -141,7 +183,11 @@ async def list_units(
     return StandardResponse(success=True, data=[UnitRead.model_validate(u) for u in units])
 
 
-@router.patch("/units/{unit_id}", response_model=StandardResponse[UnitRead])
+@router.patch(
+    "/units/{unit_id}",
+    response_model=StandardResponse[UnitRead],
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def update_unit(
     unit_id: uuid.UUID,
     data: UnitUpdate,
@@ -154,7 +200,10 @@ async def update_unit(
     return StandardResponse(success=True, data=UnitRead.model_validate(unit))
 
 
-@router.delete("/units/{unit_id}")
+@router.delete(
+    "/units/{unit_id}",
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def delete_unit(
     unit_id: uuid.UUID,
     company: Company = Depends(get_current_company),
@@ -167,7 +216,12 @@ async def delete_unit(
 
 # --- Stock Groups ---
 
-@router.post("/stock-groups", response_model=StandardResponse[StockGroupRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/stock-groups",
+    response_model=StandardResponse[StockGroupRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def create_stock_group(
     data: StockGroupCreate,
     current_user: User = Depends(get_current_user),
@@ -179,7 +233,11 @@ async def create_stock_group(
     return StandardResponse(success=True, data=StockGroupRead.model_validate(group), message="Stock group created")
 
 
-@router.get("/stock-groups", response_model=StandardResponse[List[StockGroupRead]])
+@router.get(
+    "/stock-groups",
+    response_model=StandardResponse[List[StockGroupRead]],
+    dependencies=[Depends(PermissionRequired("masters:view"))]
+)
 async def list_stock_groups(
     root_only: bool = Query(False),
     company: Company = Depends(get_current_company),
@@ -192,7 +250,12 @@ async def list_stock_groups(
 
 # --- Stock Items ---
 
-@router.post("/stock-items", response_model=StandardResponse[StockItemRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/stock-items",
+    response_model=StandardResponse[StockItemRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def create_stock_item(
     data: StockItemCreate,
     current_user: User = Depends(get_current_user),
@@ -204,7 +267,11 @@ async def create_stock_item(
     return StandardResponse(success=True, data=StockItemRead.model_validate(item), message="Stock item created")
 
 
-@router.get("/stock-items", response_model=StandardResponse[List[StockItemRead]])
+@router.get(
+    "/stock-items",
+    response_model=StandardResponse[List[StockItemRead]],
+    dependencies=[Depends(PermissionRequired("masters:view"))]
+)
 async def list_stock_items(
     company: Company = Depends(get_current_company),
     db: AsyncSession = Depends(get_db)
@@ -216,7 +283,12 @@ async def list_stock_items(
 
 # --- Warehouses ---
 
-@router.post("/warehouses", response_model=StandardResponse[WarehouseRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/warehouses",
+    response_model=StandardResponse[WarehouseRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("masters:manage"))]
+)
 async def create_warehouse(
     data: WarehouseCreate,
     current_user: User = Depends(get_current_user),
@@ -228,7 +300,11 @@ async def create_warehouse(
     return StandardResponse(success=True, data=WarehouseRead.model_validate(warehouse), message="Warehouse created")
 
 
-@router.get("/warehouses", response_model=StandardResponse[List[WarehouseRead]])
+@router.get(
+    "/warehouses",
+    response_model=StandardResponse[List[WarehouseRead]],
+    dependencies=[Depends(PermissionRequired("masters:view"))]
+)
 async def list_warehouses(
     company: Company = Depends(get_current_company),
     db: AsyncSession = Depends(get_db)

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.database.session import get_db
 from app.shared.schemas.responses import StandardResponse
-from app.modules.auth.dependencies import get_current_user, get_current_company, get_current_financial_year
+from app.modules.auth.dependencies import get_current_user, get_current_company, get_current_financial_year, PermissionRequired
 from app.modules.auth.models import User
 from app.modules.companies.models import Company, FinancialYear
 from .service import InvoiceService
@@ -14,7 +14,12 @@ from .schemas.invoices import InvoiceCreate, InvoiceUpdate, InvoiceRead
 router = APIRouter(prefix="/billing", tags=["Billing"])
 
 
-@router.post("/invoices", response_model=StandardResponse[InvoiceRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/invoices",
+    response_model=StandardResponse[InvoiceRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("invoice:create"))]
+)
 async def create_invoice(
     data: InvoiceCreate,
     current_user: User = Depends(get_current_user),
@@ -27,7 +32,11 @@ async def create_invoice(
     return StandardResponse(success=True, data=InvoiceRead.model_validate(invoice), message="Invoice created as DRAFT")
 
 
-@router.get("/invoices", response_model=StandardResponse[List[InvoiceRead]])
+@router.get(
+    "/invoices",
+    response_model=StandardResponse[List[InvoiceRead]],
+    dependencies=[Depends(PermissionRequired("invoice:view"))]
+)
 async def list_invoices(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),
@@ -35,10 +44,21 @@ async def list_invoices(
 ):
     service = InvoiceService(db)
     invoices = await service.list_invoices(company.id, fy.id)
-    return StandardResponse(success=True, data=[InvoiceRead.model_validate(i) for i in invoices])
+
+    data = []
+    for inv in invoices:
+        i_read = InvoiceRead.model_validate(inv)
+        i_read.party_name = inv.party.name if inv.party else None
+        data.append(i_read)
+
+    return StandardResponse(success=True, data=data)
 
 
-@router.get("/invoices/{invoice_id}", response_model=StandardResponse[InvoiceRead])
+@router.get(
+    "/invoices/{invoice_id}",
+    response_model=StandardResponse[InvoiceRead],
+    dependencies=[Depends(PermissionRequired("invoice:view"))]
+)
 async def get_invoice(
     invoice_id: uuid.UUID,
     company: Company = Depends(get_current_company),
@@ -49,7 +69,11 @@ async def get_invoice(
     return StandardResponse(success=True, data=InvoiceRead.model_validate(invoice))
 
 
-@router.post("/invoices/{invoice_id}/post", response_model=StandardResponse[InvoiceRead])
+@router.post(
+    "/invoices/{invoice_id}/post",
+    response_model=StandardResponse[InvoiceRead],
+    dependencies=[Depends(PermissionRequired("invoice:post"))]
+)
 async def post_invoice(
     invoice_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -61,7 +85,11 @@ async def post_invoice(
     return StandardResponse(success=True, data=InvoiceRead.model_validate(invoice), message="Invoice posted and Voucher generated")
 
 
-@router.post("/invoices/{invoice_id}/cancel", response_model=StandardResponse[InvoiceRead])
+@router.post(
+    "/invoices/{invoice_id}/cancel",
+    response_model=StandardResponse[InvoiceRead],
+    dependencies=[Depends(PermissionRequired("invoice:cancel"))]
+)
 async def cancel_invoice(
     invoice_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -73,7 +101,10 @@ async def cancel_invoice(
     return StandardResponse(success=True, data=InvoiceRead.model_validate(invoice), message="Invoice cancelled")
 
 
-@router.get("/invoices/{invoice_id}/pdf")
+@router.get(
+    "/invoices/{invoice_id}/pdf",
+    dependencies=[Depends(PermissionRequired("invoice:view"))]
+)
 async def download_invoice_pdf(
     invoice_id: uuid.UUID,
     company: Company = Depends(get_current_company),

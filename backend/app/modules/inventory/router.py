@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.database.session import get_db
 from app.shared.schemas.responses import StandardResponse
-from app.modules.auth.dependencies import get_current_user, get_current_company, get_current_financial_year
+from app.modules.auth.dependencies import get_current_user, get_current_company, get_current_financial_year, PermissionRequired
 from app.modules.auth.models import User
 from app.modules.companies.models import Company, FinancialYear
 from .service import StockAdjustmentService, StockTransferService
@@ -15,7 +15,12 @@ from .schemas.transfers import StockTransferCreate, StockTransferRead
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
 
-@router.post("/adjustments", response_model=StandardResponse[StockAdjustmentRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/adjustments",
+    response_model=StandardResponse[StockAdjustmentRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("inventory:manage"))]
+)
 async def create_adjustment(
     data: StockAdjustmentCreate,
     current_user: User = Depends(get_current_user),
@@ -28,7 +33,11 @@ async def create_adjustment(
     return StandardResponse(success=True, data=StockAdjustmentRead.model_validate(adj), message="Draft adjustment created")
 
 
-@router.get("/adjustments", response_model=StandardResponse[List[StockAdjustmentRead]])
+@router.get(
+    "/adjustments",
+    response_model=StandardResponse[List[StockAdjustmentRead]],
+    dependencies=[Depends(PermissionRequired("inventory:view"))]
+)
 async def list_adjustments(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),
@@ -39,7 +48,11 @@ async def list_adjustments(
     return StandardResponse(success=True, data=[StockAdjustmentRead.model_validate(a) for a in adjs])
 
 
-@router.get("/adjustments/{adj_id}", response_model=StandardResponse[StockAdjustmentRead])
+@router.get(
+    "/adjustments/{adj_id}",
+    response_model=StandardResponse[StockAdjustmentRead],
+    dependencies=[Depends(PermissionRequired("inventory:view"))]
+)
 async def get_adjustment(
     adj_id: uuid.UUID,
     company: Company = Depends(get_current_company),
@@ -50,7 +63,11 @@ async def get_adjustment(
     return StandardResponse(success=True, data=StockAdjustmentRead.model_validate(adj))
 
 
-@router.post("/adjustments/{adj_id}/post", response_model=StandardResponse[StockAdjustmentRead])
+@router.post(
+    "/adjustments/{adj_id}/post",
+    response_model=StandardResponse[StockAdjustmentRead],
+    dependencies=[Depends(PermissionRequired("inventory:manage"))]
+)
 async def post_adjustment(
     adj_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -62,7 +79,11 @@ async def post_adjustment(
     return StandardResponse(success=True, data=StockAdjustmentRead.model_validate(adj), message="Adjustment posted")
 
 
-@router.post("/adjustments/{adj_id}/cancel", response_model=StandardResponse[StockAdjustmentRead])
+@router.post(
+    "/adjustments/{adj_id}/cancel",
+    response_model=StandardResponse[StockAdjustmentRead],
+    dependencies=[Depends(PermissionRequired("inventory:manage"))]
+)
 async def cancel_adjustment(
     adj_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -76,7 +97,12 @@ async def cancel_adjustment(
 
 # --- Stock Transfers ---
 
-@router.post("/transfers", response_model=StandardResponse[StockTransferRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/transfers",
+    response_model=StandardResponse[StockTransferRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("inventory:manage"))]
+)
 async def create_transfer(
     data: StockTransferCreate,
     current_user: User = Depends(get_current_user),
@@ -89,7 +115,11 @@ async def create_transfer(
     return StandardResponse(success=True, data=StockTransferRead.model_validate(trn), message="Draft transfer created")
 
 
-@router.get("/transfers", response_model=StandardResponse[List[StockTransferRead]])
+@router.get(
+    "/transfers",
+    response_model=StandardResponse[List[StockTransferRead]],
+    dependencies=[Depends(PermissionRequired("inventory:view"))]
+)
 async def list_transfers(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),
@@ -100,7 +130,11 @@ async def list_transfers(
     return StandardResponse(success=True, data=[StockTransferRead.model_validate(t) for t in trns])
 
 
-@router.get("/transfers/{trn_id}", response_model=StandardResponse[StockTransferRead])
+@router.get(
+    "/transfers/{trn_id}",
+    response_model=StandardResponse[StockTransferRead],
+    dependencies=[Depends(PermissionRequired("inventory:view"))]
+)
 async def get_transfer(
     trn_id: uuid.UUID,
     company: Company = Depends(get_current_company),
@@ -111,7 +145,11 @@ async def get_transfer(
     return StandardResponse(success=True, data=StockTransferRead.model_validate(trn))
 
 
-@router.post("/transfers/{trn_id}/post", response_model=StandardResponse[StockTransferRead])
+@router.post(
+    "/transfers/{trn_id}/post",
+    response_model=StandardResponse[StockTransferRead],
+    dependencies=[Depends(PermissionRequired("inventory:manage"))]
+)
 async def post_transfer(
     trn_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -123,7 +161,11 @@ async def post_transfer(
     return StandardResponse(success=True, data=StockTransferRead.model_validate(trn), message="Transfer posted")
 
 
-@router.post("/transfers/{trn_id}/cancel", response_model=StandardResponse[StockTransferRead])
+@router.post(
+    "/transfers/{trn_id}/cancel",
+    response_model=StandardResponse[StockTransferRead],
+    dependencies=[Depends(PermissionRequired("inventory:manage"))]
+)
 async def cancel_transfer(
     trn_id: uuid.UUID,
     current_user: User = Depends(get_current_user),

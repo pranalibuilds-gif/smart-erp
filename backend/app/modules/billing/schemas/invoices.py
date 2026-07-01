@@ -60,6 +60,7 @@ class InvoiceRead(InvoiceBase):
     total_amount: float
     created_at: datetime
     updated_at: datetime
+    party_name: Optional[str] = None
 
     items: List[InvoiceItemRead] = []
 

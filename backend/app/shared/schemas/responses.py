@@ -15,5 +15,5 @@ class BaseResponse(StandardResponse[T]):
 class SuccessResponse(BaseResponse[T]):
     success: bool = True
 
-class ErrorResponse(BaseResponse[None]):
+class ErrorResponse(BaseResponse[Any]):
     success: bool = False

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.database.session import get_db
 from app.shared.schemas.responses import StandardResponse
-from app.modules.auth.dependencies import get_current_company, get_current_financial_year
+from app.modules.auth.dependencies import get_current_company, get_current_financial_year, PermissionRequired
 from app.modules.companies.models import Company, FinancialYear
 from .service import ReportService
 from .schemas.trial_balance import TrialBalanceResponse
@@ -18,7 +18,11 @@ from .schemas.warehouse_reports import WarehouseStockResponse, TransferReportIte
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
-@router.get("/trial-balance", response_model=StandardResponse[TrialBalanceResponse])
+@router.get(
+    "/trial-balance",
+    response_model=StandardResponse[TrialBalanceResponse],
+    dependencies=[Depends(PermissionRequired("report:view"))]
+)
 async def trial_balance(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),
@@ -29,7 +33,11 @@ async def trial_balance(
     return StandardResponse(success=True, data=result)
 
 
-@router.get("/general-ledger/{ledger_id}", response_model=StandardResponse[GeneralLedgerResponse])
+@router.get(
+    "/general-ledger/{ledger_id}",
+    response_model=StandardResponse[GeneralLedgerResponse],
+    dependencies=[Depends(PermissionRequired("report:view"))]
+)
 async def general_ledger(
     ledger_id: uuid.UUID,
     company: Company = Depends(get_current_company),
@@ -41,7 +49,11 @@ async def general_ledger(
     return StandardResponse(success=True, data=result)
 
 
-@router.get("/stock-summary", response_model=StandardResponse[StockSummaryResponse])
+@router.get(
+    "/stock-summary",
+    response_model=StandardResponse[StockSummaryResponse],
+    dependencies=[Depends(PermissionRequired("report:view"))]
+)
 async def stock_summary(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),
@@ -52,7 +64,11 @@ async def stock_summary(
     return StandardResponse(success=True, data=result)
 
 
-@router.get("/dashboard-metrics", response_model=StandardResponse[DashboardMetrics])
+@router.get(
+    "/dashboard-metrics",
+    response_model=StandardResponse[DashboardMetrics],
+    dependencies=[Depends(PermissionRequired("report:view"))]
+)
 async def dashboard_metrics(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),
@@ -63,7 +79,11 @@ async def dashboard_metrics(
     return StandardResponse(success=True, data=result)
 
 
-@router.get("/profit-loss", response_model=StandardResponse[ProfitLossResponse])
+@router.get(
+    "/profit-loss",
+    response_model=StandardResponse[ProfitLossResponse],
+    dependencies=[Depends(PermissionRequired("report:view"))]
+)
 async def profit_loss(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),
@@ -74,7 +94,11 @@ async def profit_loss(
     return StandardResponse(success=True, data=result)
 
 
-@router.get("/balance-sheet", response_model=StandardResponse[BalanceSheetResponse])
+@router.get(
+    "/balance-sheet",
+    response_model=StandardResponse[BalanceSheetResponse],
+    dependencies=[Depends(PermissionRequired("report:view"))]
+)
 async def balance_sheet(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),
@@ -85,7 +109,10 @@ async def balance_sheet(
     return StandardResponse(success=True, data=result)
 
 
-@router.get("/trial-balance/excel")
+@router.get(
+    "/trial-balance/excel",
+    dependencies=[Depends(PermissionRequired("report:export"))]
+)
 async def export_trial_balance(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),
@@ -103,7 +130,11 @@ async def export_trial_balance(
     )
 
 
-@router.get("/warehouse-stock/{warehouse_id}", response_model=StandardResponse[WarehouseStockResponse])
+@router.get(
+    "/warehouse-stock/{warehouse_id}",
+    response_model=StandardResponse[WarehouseStockResponse],
+    dependencies=[Depends(PermissionRequired("report:view"))]
+)
 async def warehouse_stock(
     warehouse_id: uuid.UUID,
     company: Company = Depends(get_current_company),
@@ -114,7 +145,11 @@ async def warehouse_stock(
     return StandardResponse(success=True, data=result)
 
 
-@router.get("/transfer-history", response_model=StandardResponse[List[TransferReportItem]])
+@router.get(
+    "/transfer-history",
+    response_model=StandardResponse[List[TransferReportItem]],
+    dependencies=[Depends(PermissionRequired("report:view"))]
+)
 async def transfer_history(
     company: Company = Depends(get_current_company),
     fy: FinancialYear = Depends(get_current_financial_year),

@@ -47,6 +47,35 @@ TEAM_MANAGE = "team:manage"
 # Settings Permissions
 SETTINGS_VIEW = "settings:view"
 SETTINGS_UPDATE = "settings:update"
+COMPANY_VIEW = "company:view"
+COMPANY_MANAGE = "company:manage"
+
+# Search Permissions
+SEARCH_USE = "search:use"
+
+# Report Permissions
+REPORT_VIEW = "report:view"
+
+# Billing Permissions
+INVOICE_VIEW = "invoice:view"
+INVOICE_CREATE = "invoice:create"
+INVOICE_POST = "invoice:post"
+
+# Master aliases
+MASTERS_VIEW = "masters:view"
+MASTERS_MANAGE = "masters:manage"
+
+# Banking Permissions
+BANKING_VIEW = "banking:view"
+BANKING_MANAGE = "banking:manage"
+BANKING_TRANSACT = "banking:transact"
+
+# Audit Permissions
+AUDIT_VIEW = "audit:view"
+
+# Inventory Transaction Permissions
+INVENTORY_VIEW = "inventory:view"
+INVENTORY_MANAGE = "inventory:manage"
 
 ALL_PERMISSIONS = [
     ACCOUNT_GROUP_VIEW, ACCOUNT_GROUP_CREATE, ACCOUNT_GROUP_UPDATE, ACCOUNT_GROUP_DELETE,
@@ -57,5 +86,8 @@ ALL_PERMISSIONS = [
     PARTY_VIEW, PARTY_CREATE, PARTY_UPDATE, PARTY_DELETE,
     VOUCHER_VIEW, VOUCHER_CREATE, VOUCHER_UPDATE, VOUCHER_DELETE, VOUCHER_POST, VOUCHER_CANCEL,
     TEAM_VIEW, TEAM_INVITE, TEAM_MANAGE,
-    SETTINGS_VIEW, SETTINGS_UPDATE,
+    SETTINGS_VIEW, SETTINGS_UPDATE, COMPANY_VIEW, COMPANY_MANAGE,
+    SEARCH_USE, REPORT_VIEW, INVOICE_VIEW, INVOICE_CREATE, INVOICE_POST, MASTERS_VIEW, MASTERS_MANAGE,
+    BANKING_VIEW, BANKING_MANAGE, BANKING_TRANSACT, AUDIT_VIEW,
+    INVENTORY_VIEW, INVENTORY_MANAGE
 ]

@@ -11,7 +11,7 @@ from .models import StockAdjustment, StockAdjustmentItem, StockTransfer, StockTr
 from .schemas.adjustments import StockAdjustmentCreate
 from .schemas.transfers import StockTransferCreate
 from app.modules.companies.models import FinancialYear
-from app.modules.masters.models import StockItem, StockBalance, Ledger
+from app.modules.masters.models import StockItem, StockBalance, Ledger, Warehouse
 from app.modules.vouchers.service import VoucherService, InventoryPostingService
 from app.modules.vouchers.schemas.vouchers import VoucherCreate, VoucherEntryCreate, InventoryEntryCreate
 from app.modules.audit.service import AuditService
@@ -39,6 +39,12 @@ class StockAdjustmentService:
     async def create_adjustment(self, company_id: uuid.UUID, fy: FinancialYear, user_id: uuid.UUID, data: StockAdjustmentCreate) -> StockAdjustment:
         if fy.is_closed:
             raise HTTPException(status_code=400, detail="Financial Year is closed")
+
+        # Verify warehouse ownership
+        stmt = select(Warehouse).where(and_(Warehouse.id == data.warehouse_id, Warehouse.company_id == company_id))
+        res = await self.db.execute(stmt)
+        if not res.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Invalid warehouse for this company")
 
         adj_no = await self._generate_adjustment_number(company_id, fy)
 
@@ -152,6 +158,7 @@ class StockAdjustmentService:
                     stock_item_id=item.stock_item_id,
                     quantity=float(diff),
                     rate=item.rate_snapshot,
+                    direction=1, # Inward
                     narration=f"Adj Increase: {adj.adjustment_no}"
                 ))
             else:
@@ -162,6 +169,7 @@ class StockAdjustmentService:
                     stock_item_id=item.stock_item_id,
                     quantity=float(abs(diff)),
                     rate=item.rate_snapshot,
+                    direction=-1, # Outward
                     narration=f"Adj Decrease: {adj.adjustment_no}"
                 ))
 
@@ -269,6 +277,13 @@ class StockTransferService:
         if data.from_warehouse_id == data.to_warehouse_id:
              raise HTTPException(status_code=400, detail="Source and destination warehouses cannot be the same")
 
+        # Verify warehouses ownership
+        stmt = select(Warehouse).where(and_(Warehouse.id.in_([data.from_warehouse_id, data.to_warehouse_id]), Warehouse.company_id == company_id))
+        res = await self.db.execute(stmt)
+        found_whs = res.scalars().all()
+        if len(found_whs) != 2:
+            raise HTTPException(status_code=400, detail="One or more warehouses are invalid or belong to another company")
+
         trn_no = await self._generate_transfer_number(company_id, fy)
 
         transfer = StockTransfer(
@@ -287,9 +302,12 @@ class StockTransferService:
         await self.db.flush()
 
         for item_data in data.items:
-            item_stmt = select(StockItem).where(StockItem.id == item_data.stock_item_id)
+            # Verify stock item ownership
+            item_stmt = select(StockItem).where(and_(StockItem.id == item_data.stock_item_id, StockItem.company_id == company_id))
             item_res = await self.db.execute(item_stmt)
-            stock_item = item_res.scalar_one()
+            stock_item = item_res.scalar_one_or_none()
+            if not stock_item:
+                raise HTTPException(status_code=400, detail=f"Invalid stock item: {item_data.stock_item_id}")
 
             line = StockTransferItem(
                 transfer_id=transfer.id,
@@ -331,46 +349,58 @@ class StockTransferService:
         if trn.status != InvoiceStatus.DRAFT:
             raise HTTPException(status_code=400, detail="Only draft transfers can be posted")
 
-        # 1. Update StockBalances directly for transfer
-        # (Transfers don't affect average cost generally in WAC)
-        # (Actually, they might in some systems, but here we assume items move at current cost)
+        # 1. Create a Journal Voucher to record the inventory movement sub-ledger
+        # We find the Inventory ledger. Since it's a transfer, Dr/Cr will balance to 0 on the same ledger.
+        stmt = select(Ledger).where(and_(Ledger.company_id == company_id, Ledger.name == "Inventory"))
+        res = await self.db.execute(stmt)
+        inv_ledger = res.scalar_one_or_none()
+        if not inv_ledger:
+            raise HTTPException(status_code=400, detail="Inventory ledger not found")
 
+        total_val = Decimal("0.00")
+        inventory_entries = []
         for line in trn.items:
+            total_val += Decimal(str(line.quantity)) * Decimal(str(line.rate_snapshot))
+
             # OUT from source
-            source_stmt = select(StockBalance).where(
-                and_(StockBalance.warehouse_id == trn.from_warehouse_id, StockBalance.stock_item_id == line.stock_item_id)
-            ).with_for_update()
-            res_s = await self.db.execute(source_stmt)
-            source_bal = res_s.scalar_one()
-
-            if source_bal.quantity < line.quantity:
-                 raise HTTPException(status_code=400, detail=f"Insufficient stock in source warehouse for item ID {line.stock_item_id}")
-
-            source_bal.quantity -= Decimal(str(line.quantity))
-
+            inventory_entries.append(InventoryEntryCreate(
+                warehouse_id=trn.from_warehouse_id,
+                stock_item_id=line.stock_item_id,
+                quantity=float(line.quantity),
+                rate=float(line.rate_snapshot),
+                direction=-1, # Outward
+                narration=f"Transfer Out: {trn.transfer_no}"
+            ))
             # IN to destination
-            dest_stmt = select(StockBalance).where(
-                and_(StockBalance.warehouse_id == trn.to_warehouse_id, StockBalance.stock_item_id == line.stock_item_id)
-            ).with_for_update()
-            res_d = await self.db.execute(dest_stmt)
-            dest_bal = res_d.scalar_one_or_none()
+            inventory_entries.append(InventoryEntryCreate(
+                warehouse_id=trn.to_warehouse_id,
+                stock_item_id=line.stock_item_id,
+                quantity=float(line.quantity),
+                rate=float(line.rate_snapshot),
+                direction=1, # Inward
+                narration=f"Transfer In: {trn.transfer_no}"
+            ))
 
-            if not dest_bal:
-                dest_bal = StockBalance(
-                    warehouse_id=trn.to_warehouse_id,
-                    stock_item_id=line.stock_item_id,
-                    quantity=0.00,
-                    average_cost=line.rate_snapshot, # Use transfer rate
-                    created_by=user_id,
-                    updated_by=user_id
-                )
-                self.db.add(dest_bal)
+        # Balanced entries for the voucher (Dr/Cr same ledger)
+        entries = [
+            VoucherEntryCreate(ledger_id=inv_ledger.id, debit_amount=float(total_val), credit_amount=0),
+            VoucherEntryCreate(ledger_id=inv_ledger.id, debit_amount=0, credit_amount=float(total_val))
+        ]
 
-            dest_bal.quantity += Decimal(str(line.quantity))
+        v_service = VoucherService(self.db)
+        v_data = VoucherCreate(
+            voucher_type=VoucherType.JOURNAL,
+            voucher_date=trn.transfer_date,
+            narration=f"System generated from Stock Transfer {trn.transfer_no}",
+            entries=entries,
+            inventory_entries=inventory_entries
+        )
+
+        voucher = await v_service.create_voucher(company_id, fy, user_id, v_data)
+        await v_service.post_voucher(company_id, voucher.id, user_id)
 
         trn.status = InvoiceStatus.POSTED
         trn.updated_by = user_id
-
         await self.db.commit()
 
         await self.audit_service.log_action(
@@ -382,7 +412,6 @@ class StockTransferService:
             new_values={"status": "POSTED"}
         )
         await self.db.commit()
-
         return trn
 
     async def cancel_transfer(self, company_id: uuid.UUID, trn_id: uuid.UUID, user_id: uuid.UUID) -> StockTransfer:
@@ -404,7 +433,7 @@ class StockTransferService:
              ).with_for_update()
              res_s = await self.db.execute(source_stmt)
              source_bal = res_s.scalar_one()
-             source_bal.quantity += Decimal(str(line.quantity))
+             source_bal.quantity = Decimal(str(source_bal.quantity)) + Decimal(str(line.quantity))
 
              # Remove from destination
              dest_stmt = select(StockBalance).where(
@@ -412,7 +441,7 @@ class StockTransferService:
              ).with_for_update()
              res_d = await self.db.execute(dest_stmt)
              dest_bal = res_d.scalar_one()
-             dest_bal.quantity -= Decimal(str(line.quantity))
+             dest_bal.quantity = Decimal(str(dest_bal.quantity)) - Decimal(str(line.quantity))
 
         trn.status = InvoiceStatus.CANCELLED
         trn.updated_by = user_id

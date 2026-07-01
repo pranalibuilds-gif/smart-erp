@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Optional, Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from fastapi import HTTPException, status
 
 from .models import AccountGroup, Ledger, Unit, StockGroup, StockItem, Warehouse, StockBalance
@@ -120,6 +120,8 @@ class MastersService:
         # TODO: Option B - Create Opening Voucher
 
         ledger = await self.ledger_repo.create(ledger)
+        await self.db.commit()
+        await self.db.refresh(ledger)
 
         # Index
         await self.search_service.update_index(
@@ -165,7 +167,10 @@ class MastersService:
             created_by=user_id,
             updated_by=user_id
         )
-        return await self.unit_repo.create(unit)
+        unit = await self.unit_repo.create(unit)
+        await self.db.commit()
+        await self.db.refresh(unit)
+        return unit
 
     async def get_units(self, company_id: uuid.UUID) -> Sequence[Unit]:
         stmt = select(Unit).where(Unit.company_id == company_id)
@@ -213,7 +218,10 @@ class MastersService:
             created_by=user_id,
             updated_by=user_id
         )
-        return await self.stock_group_repo.create(group)
+        group = await self.stock_group_repo.create(group)
+        await self.db.commit()
+        await self.db.refresh(group)
+        return group
 
     async def get_stock_groups(self, company_id: uuid.UUID, root_only: bool = False) -> Sequence[StockGroup]:
         stmt = select(StockGroup).where(StockGroup.company_id == company_id)
@@ -251,6 +259,8 @@ class MastersService:
             updated_by=user_id
         )
         item = await self.stock_item_repo.create(item)
+        await self.db.commit()
+        await self.db.refresh(item)
 
         # Index
         await self.search_service.update_index(
@@ -290,7 +300,10 @@ class MastersService:
             created_by=user_id,
             updated_by=user_id
         )
-        return await self.warehouse_repo.create(warehouse)
+        warehouse = await self.warehouse_repo.create(warehouse)
+        await self.db.commit()
+        await self.db.refresh(warehouse)
+        return warehouse
 
     async def list_warehouses(self, company_id: uuid.UUID) -> Sequence[Warehouse]:
         stmt = select(Warehouse).where(and_(Warehouse.company_id == company_id, Warehouse.is_active == True))

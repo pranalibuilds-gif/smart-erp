@@ -1,0 +1,1 @@
+# Phase 0C — Repository Boundary Audit\n\n| Repository File | Forbidden Imports/Calls | Analysis |\n| :--- | :--- | :--- |\n| modules\auth\repository.py | ✅ Clean | Strictly persistent. |\n| shared\database\repository.py | ✅ Clean | Strictly persistent. |

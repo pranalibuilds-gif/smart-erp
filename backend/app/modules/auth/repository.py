@@ -27,13 +27,15 @@ class RefreshTokenRepository:
         self.db.add(refresh_token)
         return refresh_token
 
-    async def get_by_hash(self, token_hash: str) -> RefreshToken | None:
-        result = await self.db.execute(
-            select(RefreshToken).where(
-                RefreshToken.token_hash == token_hash,
-                RefreshToken.revoked_at == None
-            )
+    async def get_by_hash(self, token_hash: str, for_update: bool = False) -> RefreshToken | None:
+        stmt = select(RefreshToken).where(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.revoked_at == None
         )
+        if for_update:
+            stmt = stmt.with_for_update()
+
+        result = await self.db.execute(stmt)
         return result.scalars().first()
 
     async def revoke(self, token_id: uuid.UUID) -> None:

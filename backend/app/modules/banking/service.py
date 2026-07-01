@@ -89,6 +89,14 @@ class BankingService:
             if not invoice or invoice.company_id != company_id:
                 raise HTTPException(status_code=400, detail=f"Invalid invoice ID: {alloc_data.invoice_id}")
 
+            # Hardening: Check if allocation exceeds outstanding
+            outstanding = await self.get_invoice_outstanding(invoice.id)
+            if Decimal(str(alloc_data.allocated_amount)) > outstanding:
+                 raise HTTPException(
+                     status_code=400,
+                     detail=f"Allocation of {alloc_data.allocated_amount} exceeds outstanding amount of {outstanding} for invoice {invoice.invoice_number}"
+                 )
+
             allocation = PaymentAllocation(
                 voucher_id=voucher.id,
                 invoice_id=alloc_data.invoice_id,

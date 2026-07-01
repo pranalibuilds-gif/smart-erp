@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from sqlalchemy import String, ForeignKey, Boolean, Numeric, Enum, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.database.base import Base
@@ -30,9 +31,9 @@ class Ledger(Base, UUIDMixin, AuditMixin):
     name: Mapped[str] = mapped_column(String(255), index=True)
     code: Mapped[str | None] = mapped_column(String(50), index=True)
 
-    opening_balance: Mapped[float] = mapped_column(Numeric(15, 2), default=0.00)
+    opening_balance: Mapped[float] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
     opening_balance_type: Mapped[BalanceType] = mapped_column(Enum(BalanceType), default=BalanceType.DEBIT)
-    current_balance: Mapped[float] = mapped_column(Numeric(15, 2), default=0.00)
+    current_balance: Mapped[float] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
 
     ledger_type: Mapped[LedgerType] = mapped_column(Enum(LedgerType), default=LedgerType.GENERAL)
 
@@ -75,10 +76,10 @@ class StockItem(Base, UUIDMixin, AuditMixin):
 
     item_type: Mapped[ItemType] = mapped_column(Enum(ItemType), default=ItemType.PRODUCT)
 
-    current_quantity: Mapped[float] = mapped_column(Numeric(15, 3), default=0.00)
-    average_cost: Mapped[float] = mapped_column(Numeric(15, 2), default=0.00)
+    current_quantity: Mapped[float] = mapped_column(Numeric(15, 3), default=Decimal("0.000"))
+    average_cost: Mapped[float] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
 
-    reorder_level: Mapped[float] = mapped_column(Numeric(15, 3), default=0.00)
+    reorder_level: Mapped[float] = mapped_column(Numeric(15, 3), default=Decimal("0.000"))
 
     is_active: Mapped[bool] = mapped_column(default=True)
 
@@ -108,8 +109,8 @@ class StockBalance(Base, UUIDMixin, AuditMixin):
     warehouse_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), index=True)
     stock_item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("stock_items.id", ondelete="CASCADE"), index=True)
 
-    quantity: Mapped[float] = mapped_column(Numeric(15, 3), default=0.00)
-    average_cost: Mapped[float] = mapped_column(Numeric(15, 2), default=0.00)
+    quantity: Mapped[float] = mapped_column(Numeric(15, 3), default=Decimal("0.000"))
+    average_cost: Mapped[float] = mapped_column(Numeric(15, 2), default=Decimal("0.00"))
 
     __table_args__ = (
         UniqueConstraint("warehouse_id", "stock_item_id", name="uq_stock_balance_per_warehouse"),

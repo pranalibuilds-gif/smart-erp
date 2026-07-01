@@ -63,15 +63,18 @@ class CompanyService:
         self.db.add(financial_year)
 
         # 3. Assign Creator as ADMIN
-        # Find ADMIN role
-        role_stmt = select(Role).where(Role.name == "ADMIN")
+        # Find ADMIN role with permissions loaded
+        from sqlalchemy.orm import selectinload
+        role_stmt = select(Role).where(Role.name == "ADMIN").options(selectinload(Role.permissions))
         role_result = await self.db.execute(role_stmt)
         admin_role = role_result.scalar_one_or_none()
 
         if not admin_role:
-            admin_role = Role(name="ADMIN", description="Company Administrator")
+            admin_role = Role(name="ADMIN", description="Company Administrator", permissions=[])
             self.db.add(admin_role)
             await self.db.flush()
+            # Refresh to handle relationship correctly
+            admin_role = (await self.db.execute(select(Role).where(Role.id == admin_role.id).options(selectinload(Role.permissions)))).scalar_one()
 
         # Ensure ADMIN role has all permissions
         for perm_name in ALL_PERMISSIONS:

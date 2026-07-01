@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from app.shared.database.session import get_db
 from app.shared.schemas.responses import StandardResponse
-from app.modules.auth.dependencies import get_current_company
+from app.modules.auth.dependencies import get_current_company, PermissionRequired
 from app.modules.companies.models import Company
 from .service import AuditService
 from .schemas.audit import AuditLogRead
@@ -16,7 +16,11 @@ from .models import AuditLog
 router = APIRouter(prefix="/audit", tags=["Audit"])
 
 
-@router.get("/logs", response_model=StandardResponse[List[AuditLogRead]])
+@router.get(
+    "/logs",
+    response_model=StandardResponse[List[AuditLogRead]],
+    dependencies=[Depends(PermissionRequired("audit:view"))]
+)
 async def get_audit_logs(
     entity_type: Optional[str] = Query(None),
     entity_id: Optional[uuid.UUID] = Query(None),

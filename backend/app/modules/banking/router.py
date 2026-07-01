@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.database.session import get_db
 from app.shared.schemas.responses import StandardResponse
-from app.modules.auth.dependencies import get_current_user, get_current_company, get_current_financial_year
+from app.modules.auth.dependencies import get_current_user, get_current_company, get_current_financial_year, PermissionRequired
 from app.modules.auth.models import User
 from app.modules.companies.models import Company, FinancialYear
 from app.modules.vouchers.schemas.vouchers import VoucherRead
@@ -16,7 +16,12 @@ from .schemas.statements import BankStatementCreate, BankStatementRead, BankStat
 router = APIRouter(prefix="/banking", tags=["Banking"])
 
 
-@router.post("/bank-accounts", response_model=StandardResponse[BankAccountRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/bank-accounts",
+    response_model=StandardResponse[BankAccountRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("banking:manage"))]
+)
 async def create_bank_account(
     data: BankAccountCreate,
     current_user: User = Depends(get_current_user),
@@ -28,7 +33,11 @@ async def create_bank_account(
     return StandardResponse(success=True, data=BankAccountRead.model_validate(account), message="Bank account linked")
 
 
-@router.get("/bank-accounts", response_model=StandardResponse[List[BankAccountRead]])
+@router.get(
+    "/bank-accounts",
+    response_model=StandardResponse[List[BankAccountRead]],
+    dependencies=[Depends(PermissionRequired("banking:view"))]
+)
 async def list_bank_accounts(
     company: Company = Depends(get_current_company),
     db: AsyncSession = Depends(get_db)
@@ -38,7 +47,12 @@ async def list_bank_accounts(
     return StandardResponse(success=True, data=[BankAccountRead.model_validate(a) for a in accounts])
 
 
-@router.post("/payments", response_model=StandardResponse[VoucherRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/payments",
+    response_model=StandardResponse[VoucherRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("banking:transact"))]
+)
 async def create_payment(
     data: PaymentVoucherCreate,
     current_user: User = Depends(get_current_user),
@@ -51,7 +65,12 @@ async def create_payment(
     return StandardResponse(success=True, data=VoucherRead.model_validate(voucher), message="Payment recorded and posted")
 
 
-@router.post("/receipts", response_model=StandardResponse[VoucherRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/receipts",
+    response_model=StandardResponse[VoucherRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("banking:transact"))]
+)
 async def create_receipt(
     data: PaymentVoucherCreate,
     current_user: User = Depends(get_current_user),
@@ -64,7 +83,11 @@ async def create_receipt(
     return StandardResponse(success=True, data=VoucherRead.model_validate(voucher), message="Receipt recorded and posted")
 
 
-@router.get("/invoices/{invoice_id}/outstanding", response_model=StandardResponse[float])
+@router.get(
+    "/invoices/{invoice_id}/outstanding",
+    response_model=StandardResponse[float],
+    dependencies=[Depends(PermissionRequired("banking:view"))]
+)
 async def get_invoice_outstanding(
     invoice_id: uuid.UUID,
     db: AsyncSession = Depends(get_db)
@@ -74,7 +97,12 @@ async def get_invoice_outstanding(
     return StandardResponse(success=True, data=float(outstanding))
 
 
-@router.post("/statements", response_model=StandardResponse[BankStatementRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/statements",
+    response_model=StandardResponse[BankStatementRead],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(PermissionRequired("banking:manage"))]
+)
 async def import_statement(
     data: BankStatementCreate,
     current_user: User = Depends(get_current_user),
@@ -86,7 +114,11 @@ async def import_statement(
     return StandardResponse(success=True, data=BankStatementRead.model_validate(statement), message="Bank statement imported")
 
 
-@router.post("/statement-lines/{line_id}/reconcile", response_model=StandardResponse[BankStatementLineRead])
+@router.post(
+    "/statement-lines/{line_id}/reconcile",
+    response_model=StandardResponse[BankStatementLineRead],
+    dependencies=[Depends(PermissionRequired("banking:manage"))]
+)
 async def reconcile_statement_line(
     line_id: uuid.UUID,
     voucher_id: uuid.UUID,

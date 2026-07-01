@@ -1,6 +1,6 @@
 import uuid
 from datetime import date
-from sqlalchemy import String, ForeignKey, Date, Enum, Numeric, UniqueConstraint, Integer
+from sqlalchemy import String, ForeignKey, Date, Enum, Numeric, UniqueConstraint, Integer, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.database.base import Base
 from app.shared.database.mixins import UUIDMixin, AuditMixin
@@ -28,6 +28,7 @@ class Voucher(Base, UUIDMixin, AuditMixin):
 
     __table_args__ = (
         UniqueConstraint("company_id", "financial_year_id", "voucher_type", "voucher_number", name="uq_voucher_number"),
+        Index("ix_vouchers_filtering", "company_id", "financial_year_id", "status"),
     )
 
 
@@ -65,6 +66,10 @@ class InventoryTransaction(Base, UUIDMixin, AuditMixin):
     voucher = relationship("Voucher", back_populates="inventory_entries")
     warehouse = relationship("app.modules.masters.models.Warehouse")
     stock_item = relationship("app.modules.masters.models.StockItem")
+
+    __table_args__ = (
+        Index("ix_inventory_transactions_item_wh", "stock_item_id", "warehouse_id"),
+    )
 
 
 class VoucherSequence(Base):
